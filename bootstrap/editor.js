@@ -16,11 +16,10 @@
 
 var colors = [ "Aqua","Aquamarine","Bisque","Black","BlanchedAlmond","Blue","BlueViolet","Brown","BurlyWood","CadetBlue","Chartreuse","Chocolate","Coral","CornflowerBlue","Cornsilk","Crimson","Cyan","DarkBlue","DarkCyan","DarkGoldenRod","DarkGray","DarkGreen","DarkKhaki","DarkMagenta","DarkOliveGreen","Darkorange","DarkOrchid","DarkRed","DarkSalmon","DarkSeaGreen","DarkSlateBlue","DarkSlateGray","DarkTurquoise","DarkViolet","DeepPink","DeepSkyBlue","DimGray","DimGrey","DodgerBlue","FireBrick","ForestGreen","Fuchsia","Gainsboro","Gold","GoldenRod","Gray","Green","GreenYellow","HotPink","IndianRed","Indigo","Ivory","Khaki","Lavender","LavenderBlush","LawnGreen","LemonChiffon","LightBlue","LightCoral","LightCyan","LightGoldenRodYellow","LightGray","LightGreen","LightPink","LightSalmon","LightSeaGreen","LightSkyBlue","LightSlateGray","LightSteelBlue","Lime","LimeGreen","Linen","Magenta","Maroon","MediumAquaMarine","MediumBlue","MediumOrchid","MediumPurple","MediumSeaGreen","MediumSlateBlue","MediumSpringGreen","MediumTurquoise","MediumVioletRed","MidnightBlue","MistyRose","Moccasin","Navy","Olive","OliveDrab","Orange","OrangeRed","Orchid","PaleGoldenRod","PaleGreen","PaleTurquoise","PaleVioletRed","PapayaWhip","PeachPuff","Peru","Pink","Plum","PowderBlue","Purple","Red","RosyBrown","RoyalBlue","SaddleBrown","Salmon","SandyBrown","SeaGreen","Sienna","Silver","SkyBlue","SlateBlue","SlateGray","Snow","SpringGreen","SteelBlue","Tan","Teal","Thistle","Tomato","Turquoise","Violet","Wheat","Yellow","YellowGreen" ]
 
-Array.prototype.remove = function(from, to) {
-  var rest = this.slice((to || from) + 1 || this.length);
-  this.length = from < 0 ? this.length + from : from;
-  return this.push.apply(this, rest);
-};
+function cloneLatLng(ll) {
+  return new L.LatLng(ll.lat, ll.lng);
+}
+
 
 var MapPage = Backbone.View.extend({
   calculateBestVote: function(feature) {
@@ -45,7 +44,7 @@ var MapPage = Backbone.View.extend({
       var randomnumber=Math.floor(Math.random()*colors.length)
       color = colors[randomnumber];
       this.labelColors_[bestLabel] = color;
-      colors.remove(randomnumber);
+      colors = _.without(colors, color)
     }
     return color;
   },
@@ -58,6 +57,7 @@ var MapPage = Backbone.View.extend({
   },
 
   initialize: function() {
+    this.idToLayerMap_ = {}
     this.inPaintMode_ = true;
     this.$selectedNeighborhoodSpan = $('#selectedNeighborhood');
 
@@ -98,8 +98,54 @@ var MapPage = Backbone.View.extend({
     return this.inPaintMode_;
   },
 
+  highlightBlocks: function(blockIdsResponse) {
+    var blocks = blockIdsResponse['ids'];
+    _.each(blocks, _.bind(function(id) {
+      this.idToLayerMap_[id].setStyle({
+          weight: 1,
+          color: 'orange',
+          opacity: 1.0
+        });
+
+    }, this))
+  },
+
+  highlightBlocksByGeometry: function(latlngs) {
+    var lls = _.map(latlngs.concat([latlngs[0]]), function(ll) { return ll.lng + " " + ll.lat }).join(',')
+    $.ajax({
+      dataType: "json",
+      url: "http://ubuntu-virtualbox.local:5000/blocksByGeom?callback=?",
+      data: { ll: lls },
+      success: _.bind(this.highlightBlocks, this)
+    })
+
+  },
+
+  processClick: function(e) { 
+    console.log('click')
+    console.log(e)
+    if (this.inPaintMode()) {
+      console.log('in paint mode')
+      if (this.currentPaintLine_) {
+        var lastIndex = this.currentPaintLine_.getLatLngs().length - 1
+        console.log(this.currentPaintLine_.getLatLngs()[0].distanceTo(e.latlng));
+        if (this.currentPaintLine_.getLatLngs()[0].distanceTo(e.latlng) < 100) {
+          this.highlightBlocksByGeometry(this.currentPaintLine_.getLatLngs())
+          this.currentPaintLine_ = null;
+        } else {
+          this.currentPaintLine_.spliceLatLngs(lastIndex, 1, cloneLatLng(e.latlng), cloneLatLng(e.latlng));
+        }
+      } else {
+        this.currentPaintLine_ = new L.Polyline([cloneLatLng(e.latlng), cloneLatLng(e.latlng)]);
+        this.map_.addLayer(this.currentPaintLine_);
+      }
+    } 
+    L.DomEvent.stopPropagation(e);
+  },
+
   renderData: function(geojson) {
 		var map = L.map('map', {dragging: true}).setView([40.74, -74], 13);
+    this.map_ = map;
 false
    	L.tileLayer('http://{s}.tile.cloudmade.com/{key}/22677/256/{z}/{x}/{y}.png', {
 			attribution: 'Map data &copy; 2011 OpenStreetMap contributors, Imagery &copy; 2012 CloudMade',
@@ -114,16 +160,13 @@ false
       ).addTo(map); */
 
 		function onEachFeature(feature, layer) {
+      this.idToLayerMap_[feature.properties.id] = layer
       this.colorFeature(feature, layer); 
 //			layer.bindPopup(popupContent);
 
-      layer.on('mousedown', function(e) {
+      /*layer.on('mousedown', function(e) {
         console.log(e)
-      });
-     layer.on('click', function(e) {
-        console.log(e)
-      });
-
+      }); */
 		}
 
 		var geojsonLayer = L.geoJson([geojson], {
@@ -135,6 +178,19 @@ false
 		})
     
     geojsonLayer.addTo(map);
+ 
+    map.on('click', _.bind(this.processClick, this))
+    geojsonLayer.on('click', _.bind(this.processClick, this))
+
+    map.on('mousemove', _.bind(function(e) {
+        // console.log(e)
+        if (this.inPaintMode()) {
+          if (this.currentPaintLine_) {
+            var lastIndex = this.currentPaintLine_.getLatLngs().length - 1
+            this.currentPaintLine_.spliceLatLngs(lastIndex, 1, cloneLatLng(e.latlng));
+          }
+        } 
+      }, this));
 
     geojsonLayer.on('contextmenu', _.bind(function(e) {
       console.log(e)
@@ -142,7 +198,7 @@ false
       this.setSelectedNeighborhood(bestVote.id, bestVote.label);
     }, this));
     
-    geojsonLayer.on('click', function(e) {
+    /*geojsonLayer.on('click', function(e) {
       console.log(e)
     });
 
@@ -171,6 +227,7 @@ false
       }
 
     }, this))
+    */
 
 
     geojsonLayer.on('mouseover', _.bind(function(e) {
