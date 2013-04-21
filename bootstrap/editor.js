@@ -12,16 +12,23 @@
 // server-side:
 // filter out water
 // add "smoothing" votes
-// serve a list of candidates per areaid
 
 var colors = [ "Aqua","Aquamarine","Bisque","Black","BlanchedAlmond","Blue","BlueViolet","Brown","BurlyWood","CadetBlue","Chartreuse","Chocolate","Coral","CornflowerBlue","Cornsilk","Crimson","Cyan","DarkBlue","DarkCyan","DarkGoldenRod","DarkGray","DarkGreen","DarkKhaki","DarkMagenta","DarkOliveGreen","Darkorange","DarkOrchid","DarkRed","DarkSalmon","DarkSeaGreen","DarkSlateBlue","DarkSlateGray","DarkTurquoise","DarkViolet","DeepPink","DeepSkyBlue","DimGray","DimGrey","DodgerBlue","FireBrick","ForestGreen","Fuchsia","Gainsboro","Gold","GoldenRod","Gray","Green","GreenYellow","HotPink","IndianRed","Indigo","Ivory","Khaki","Lavender","LavenderBlush","LawnGreen","LemonChiffon","LightBlue","LightCoral","LightCyan","LightGoldenRodYellow","LightGray","LightGreen","LightPink","LightSalmon","LightSeaGreen","LightSkyBlue","LightSlateGray","LightSteelBlue","Lime","LimeGreen","Linen","Magenta","Maroon","MediumAquaMarine","MediumBlue","MediumOrchid","MediumPurple","MediumSeaGreen","MediumSlateBlue","MediumSpringGreen","MediumTurquoise","MediumVioletRed","MidnightBlue","MistyRose","Moccasin","Navy","Olive","OliveDrab","Orange","OrangeRed","Orchid","PaleGoldenRod","PaleGreen","PaleTurquoise","PaleVioletRed","PapayaWhip","PeachPuff","Peru","Pink","Plum","PowderBlue","Purple","Red","RosyBrown","RoyalBlue","SaddleBrown","Salmon","SandyBrown","SeaGreen","Sienna","Silver","SkyBlue","SlateBlue","SlateGray","Snow","SpringGreen","SteelBlue","Tan","Teal","Thistle","Tomato","Turquoise","Violet","Wheat","Yellow","YellowGreen" ]
 
 function cloneLatLng(ll) {
   return new L.LatLng(ll.lat, ll.lng);
-}
-
-
+};
+ 
 var MapPage = Backbone.View.extend({
+  promptModal: function() {
+    modalEl = $('#neighborhoodSelectModal')
+    modalEl.modal();
+    modalEl.find($('.closeButton')).on('click', function() {
+      modalEl.modal('toggle');
+    })
+
+  },
+    
   calculateBestVote: function(feature) {
     return _.max(feature.properties['votes'], function(v) { return v.count })
   },
@@ -56,13 +63,32 @@ var MapPage = Backbone.View.extend({
     this.$selectedNeighborhoodSpan.text(label);
   },
 
+  storeLabels: function(labelData) {
+    this.labels_ = labelData['labels']; 
+    var select = $('.neighborhoodSelect');
+
+    // sort by name?
+    _.each(this.labels_, function(label) {
+      select.append($('<option>', { value: label['id'] }).text(label['label']));
+    });
+  },
+
   initialize: function() {
     this.idToLayerMap_ = {}
-    this.inPaintMode_ = true;
+    this.inPaintMode_ = false;
     this.$selectedNeighborhoodSpan = $('#selectedNeighborhood');
 
+    this.labels_ = {};
     this.labelColors_ = {};
     console.log(this.options);
+
+    $.ajax({
+      dataType: "json",
+      url: "http://ubuntu-virtualbox.local:5000/labels?callback=?",
+      data: { areaid: '36061' },
+      success: _.bind(this.storeLabels, this)
+    })
+
     if (this.options.geojson) {
       this.renderData(this.options.geojson);
     } else {
@@ -99,9 +125,18 @@ var MapPage = Backbone.View.extend({
   },
 
   highlightBlocks: function(blockIdsResponse) {
-    var blocks = blockIdsResponse['ids'];
-    _.each(blocks, _.bind(function(id) {
-      this.idToLayerMap_[id].setStyle({
+    _.each(this.lastHighlightedBlocks_, _.bind(function(block) {
+      this.colorFeature(block.feature, block);
+    }, this));
+
+    var blocks = _.map(blockIdsResponse['ids'], _.bind(function(id) {
+      return this.idToLayerMap_[id];
+    }, this));
+
+    this.lastHighlightedBlocks_ = blocks;
+    
+    _.each(blocks, _.bind(function(block) {
+      block.setStyle({
           weight: 1,
           color: 'orange',
           opacity: 1.0
@@ -112,6 +147,7 @@ var MapPage = Backbone.View.extend({
 
   highlightBlocksByGeometry: function(latlngs) {
     var lls = _.map(latlngs.concat([latlngs[0]]), function(ll) { return ll.lng + " " + ll.lat }).join(',')
+    console.log('firing off highlight blocks')
     $.ajax({
       dataType: "json",
       url: "http://ubuntu-virtualbox.local:5000/blocksByGeom?callback=?",
@@ -119,6 +155,23 @@ var MapPage = Backbone.View.extend({
       success: _.bind(this.highlightBlocks, this)
     })
 
+  },
+
+  processDoubleClick: function(e) { 
+    console.log('dblclick')
+    console.log(e)
+    if (this.inPaintMode()) {
+      console.log('in paint mode')
+      if (this.currentPaintLine_) {
+        this.highlightBlocksByGeometry(this.currentPaintLine_.getLatLngs())
+        this.currentPaintLine_ = null;
+      }
+    } 
+    L.DomEvent.stopPropagation(e);
+  },
+
+  clearSelection: function() {
+    
   },
 
   processClick: function(e) { 
@@ -133,24 +186,37 @@ var MapPage = Backbone.View.extend({
           this.highlightBlocksByGeometry(this.currentPaintLine_.getLatLngs())
           this.currentPaintLine_ = null;
         } else {
+          this.highlightBlocksByGeometry(this.currentPaintLine_.getLatLngs())
           this.currentPaintLine_.spliceLatLngs(lastIndex, 1, cloneLatLng(e.latlng), cloneLatLng(e.latlng));
         }
       } else {
-        this.currentPaintLine_ = new L.Polyline([cloneLatLng(e.latlng), cloneLatLng(e.latlng)]);
+        this.currentPaintLine_ = new L.Polygon([cloneLatLng(e.latlng), cloneLatLng(e.latlng)]);
         this.map_.addLayer(this.currentPaintLine_);
       }
+    } else {
+      this.promptModal()
     } 
     L.DomEvent.stopPropagation(e);
   },
 
+  togglePaintMode: function() {
+    this.inPaintMode_ = !this.inPaintMode_;
+  },
+
   renderData: function(geojson) {
 		var map = L.map('map', {dragging: true}).setView([40.74, -74], 13);
+    this.$paintMode = $('#paintMode')
+    this.$paintMode.button();
+    this.$paintMode.click(_.bind(this.togglePaintMode, this))
+
     this.map_ = map;
-false
+    this.map_.doubleClickZoom.disable(); 
    	L.tileLayer('http://{s}.tile.cloudmade.com/{key}/22677/256/{z}/{x}/{y}.png', {
 			attribution: 'Map data &copy; 2011 OpenStreetMap contributors, Imagery &copy; 2012 CloudMade',
 			key: 'BC9A493B41014CAABB98F0471D759707'
 		}).addTo(map);
+
+    this.lastHighlightedBlocks_ = [];
 
     /* new L.tileLayer(
         'http://otile{s}.mqcdn.com/tiles/1.0.0/osm/{z}/{x}/{y}.png',
@@ -180,6 +246,7 @@ false
     geojsonLayer.addTo(map);
  
     map.on('click', _.bind(this.processClick, this))
+    map.on('dblclick', _.bind(this.processDoubleClick, this))
     geojsonLayer.on('click', _.bind(this.processClick, this))
 
     map.on('mousemove', _.bind(function(e) {
@@ -192,11 +259,11 @@ false
         } 
       }, this));
 
-    geojsonLayer.on('contextmenu', _.bind(function(e) {
+    /*geojsonLayer.on('contextmenu', _.bind(function(e) {
       console.log(e)
       var bestVote = this.calculateBestVote(e.layer.feature)
       this.setSelectedNeighborhood(bestVote.id, bestVote.label);
-    }, this));
+    }, this));*/
     
     /*geojsonLayer.on('click', function(e) {
       console.log(e)
@@ -231,23 +298,18 @@ false
 
 
     geojsonLayer.on('mouseover', _.bind(function(e) {
-      if (this.inPaintMode() && this.startedPainting_) {
-        e.layer.feature.properties.votes.push({
-          source: 'self',
-          count: 10000,
-          id: this.selectedNeighborhoodId_,
-          label: this.selectedNeighborhoodLabel_
-        });
+      e.layer.setStyle({
+        weight: 1,
+        color: 'red',
+        opacity: 1.0
+      });
 
-    
-      } else {
-        e.layer.setStyle({
-          weight: 1,
-          color: 'red',
-          opacity: 1.0
-        });
-      }
-      this.currentFeatureHovered_ =  e.layer.feature;
+      $('#neighborhoodInfo').html(
+        "id<br>" +
+        e.layer.feature.properties.id +
+        "<br>label<br>" +
+        this.calculateBestLabel(e.layer.feature)
+      );
     }, this));
 
     var mouseOutCb = function(e) {
