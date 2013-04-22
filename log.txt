@@ -1,0 +1,9 @@
+shp2pgsql -p -I -D tl_2010_06_tabblock10.shp tabblock10  | psql -U postgres gis
+# for i in *shp; do shp2pgsql -s 4326:900913 -a $i tabblock10 | psql -U postgres gis; done
+for i in *shp; do shp2pgsql -s 4326 -a $i tabblock10 | psql -U postgres gis; done
+
+
+psql gis -f votes.sql 
+
+
+
