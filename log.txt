@@ -5,5 +5,7 @@ for i in *shp; do shp2pgsql -s 4326 -a $i tabblock10 | psql -U postgres gis; don
 
 psql gis -f votes.sql 
 
+copy geoplanet_places FROM '/home/blackmad/geoplanet/geoplanet_places_7.10.0.tsv' WITH csv header delimiter e'\t';
+
 
 

@@ -19,7 +19,7 @@ function cloneLatLng(ll) {
   return new L.LatLng(ll.lat, ll.lng);
 };
 
-var host = "http://192.73.238.76:8080";
+var host = "http://192.73.238.76:5000";
  
 var MapPage = Backbone.View.extend({
   promptModal: function() {
@@ -87,7 +87,7 @@ var MapPage = Backbone.View.extend({
     $.ajax({
       dataType: "json",
       url: host + "/labels?callback=?",
-      data: { areaid: '36061' },
+      data: { areaid: this.options.areaid },
       success: _.bind(this.storeLabels, this)
     })
 
@@ -103,7 +103,7 @@ var MapPage = Backbone.View.extend({
     $.ajax({
       dataType: "json",
       url: host + "/citydata?callback=?",
-      data: { areaid: '36061' },
+      data: { areaid: areaid },
       success: _.bind(this.renderData, this)
     })
   },
@@ -206,7 +206,7 @@ var MapPage = Backbone.View.extend({
   },
 
   renderData: function(geojson) {
-		var map = L.map('map', {dragging: true}).setView([40.74, -74], 13);
+	var map = L.map('map', {dragging: true}).setView([40.74, -74], 13);
     this.$paintMode = $('#paintMode')
     this.$paintMode.button();
     this.$paintMode.click(_.bind(this.togglePaintMode, this))
@@ -227,7 +227,13 @@ var MapPage = Backbone.View.extend({
         }
       ).addTo(map); */
 
-		function onEachFeature(feature, layer) {
+    var centered = false;
+    function onEachFeature(feature, layer) {
+      if (!centered) {
+        window.console.log(feature);
+        map.panTo(new L.LatLng(feature.geometry.coordinates[0][0][0][1], feature.geometry.coordinates[0][0][0][0]));
+        centered = true;
+      } 
       this.idToLayerMap_[feature.properties.id] = layer
       this.colorFeature(feature, layer); 
 //			layer.bindPopup(popupContent);

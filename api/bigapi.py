@@ -1,6 +1,6 @@
 #!/usr/bin/python
-# select COUNT(*) FROM "tabblock2010_36_pophu-900913" tb WHERE geom && ST_SetSRID(ST_MakeBox2D(ST_Transform(ST_GeomFromText('POINT(-74.13711547851562 40.526326510744006)', 4326), 900913), ST_Transform(ST_GeomFromText('POINT(-73.641357421875 40.90936126702326)', 4326), 900913)), 900913);
 from flask import Flask
+import flask_gzip
 import json
 import re
 from functools import wraps
@@ -31,8 +31,8 @@ def makeFeature(row, voteDict):
     "type": "Feature",
     "geometry": eval(row['geojson_geom']),
     "properties": {
-      "id": row['blockid10'],
-      "votes": voteDict[row['blockid10']]
+      "id": row['geoid10'],
+      "votes": voteDict[row['geoid10']]
     }
   }
 
@@ -51,7 +51,7 @@ def blocksByArea():
     wkt = 'POLYGON((%s))' % ll
   print wkt
 
-  comm = cur.mogrify("""select blockid10 FROM "tabblock2010_36_pophu-900913" tb WHERE ST_Intersects(geom, ST_Transform(ST_GeomFromText(%s, 4326), 900913))""", (wkt,))
+  comm = cur.mogrify("""select geoid10 FROM tabblock10 tb WHERE ST_Intersects(geom, ST_Transform(ST_GeomFromText(%s, 4326), 4326))""", (wkt,))
   print(comm)
   cur.execute(comm)
   rows = cur.fetchall()
@@ -65,15 +65,13 @@ def citydata():
 
   areaid = request.args.get('areaid', False)
 
-#    cur.execute("""select blockid10, ST_AsGeoJSON(ST_Transform(geom, 4326)) as geojson_geom FROM "tabblock2010_36_pophu-900913" tb WHERE geom && ST_SetSRID(ST_MakeBox2D(ST_Transform(ST_GeomFromText('POINT(-74.13711547851562 40.526326510744006)', 4326), 900913), ST_Transform(ST_GeomFromText('POINT(-73.641357421875 40.90936126702326)', 4326), 900913)), 900913)""")
-
   statefp10 = areaid[0:2]
   countyfp10 = areaid[2:]
 
-  cur.execute("""select blockid10, ST_AsGeoJSON(ST_Transform(geom, 4326)) as geojson_geom FROM "tabblock2010_36_pophu-900913" tb WHERE statefp10 = %s AND countyfp10 = %s""", (statefp10, countyfp10))
+  cur.execute("""select geoid10, ST_AsGeoJSON(ST_Transform(geom, 4326)) as geojson_geom FROM tabblock10 tb WHERE statefp10 = %s AND countyfp10 = %s""", (statefp10, countyfp10))
   rows = cur.fetchall()
 
-  cur.execute("""select id, label, count, source, name FROM votes2 v JOIN geoplanet ON label = woeid WHERE statefp10 = %s AND countyfp10 = %s""",(statefp10, countyfp10))
+  cur.execute("""select id, label, count, source, name FROM votes v JOIN geoplanet_places ON label::int = woe_id WHERE statefp10 = %s AND countyfp10 = %s""",(statefp10, countyfp10))
   votes = defaultdict(list)
   for r in cur.fetchall():
     votes[r['id']].append({
@@ -100,7 +98,7 @@ def labels():
   statefp10 = areaid[0:2]
   countyfp10 = areaid[2:]
 
-  cur.execute("""select distinct(label, name) FROM votes2 v JOIN geoplanet ON label = woeid WHERE statefp10 = %s AND countyfp10 = %s""",(statefp10, countyfp10))
+  cur.execute("""select distinct(label, name) FROM votes v JOIN geoplanet_places ON label::int = woe_id WHERE statefp10 = %s AND countyfp10 = %s""",(statefp10, countyfp10))
   rows = cur.fetchall()
 
   response = []
@@ -118,6 +116,7 @@ def labels():
 
 
 if __name__ == '__main__':
+  flask_gzip.Gzip(app)
   app.run(debug=True, 
    host='0.0.0.0'
   )

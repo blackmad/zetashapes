@@ -65,7 +65,6 @@ box-shadow: 1px 2px 6px rgba(0, 0, 0, 0.5);
   <script src="js/underscore-min.js"></script>
   <script src="js/backbone.js"></script>
   <script src="editor.js"></script>
-	<script src="nyc.json" type="text/javascript"></script>
 
 </head>
 <body>
@@ -130,11 +129,11 @@ this is the control box
 
 	<script>
     $('.controlBox').button()
+    var areaid = window.location.hash.substr(1)
 
     $(
       new MapPage({
-        geojson: geojson,
-        areaid: '36061'
+        areaid: areaid
       })
     );
 	</script>
