@@ -7,9 +7,11 @@ from collections import defaultdict
 
 import sys
 
-ID_COL = 'blockid10'
-TABLE = 'tabblock2010_36_pophu-900913'
-TABLE_SRID = 900913
+ID_COL = 'geoid10'
+TABLE = 'tabblock10'
+FROM_SRID = 4326
+TABLE_SRID = 4326
+# TABLE_SRID = 900913
 
 VOTE_TABLE = 'votes'
 
@@ -29,8 +31,11 @@ for line in input_file:
     parts = line.split('\t')
     (junk, id, lon, lat) = parts[0], parts[1], parts[2], parts[3]
     cur = conn.cursor()
-    cur.execute("""SELECT %s FROM "%s" WHERE ST_CONTAINS(geom, ST_Transform(ST_GeomFromText('POINT(%s %s)', 4326), %s))""" % (ID_COL, TABLE, lon, lat, TABLE_SRID))
+    cur.execute("""SELECT %s FROM "%s" WHERE ST_CONTAINS(geom, ST_Transform(ST_GeomFromText('POINT(%s %s)', %s), %s))""" % (ID_COL, TABLE, lon, lat, FROM_SRID, TABLE_SRID))
     rows = cur.fetchall()
+
+    if len(rows) == 0:
+      print "no blocks found for %s %s" % (lat, lon)
 
     for row in rows:
       counts[row[0]][id] += 1
@@ -44,9 +49,16 @@ for blockid in counts:
   for woeid in counts[blockid]:
     c += 1
     cur = conn.cursor()
-    cur.execute("""INSERT INTO votes2(id, label, count, source) VALUES (%s, %s, %s, 'flickr');""", (
-      blockid, woeid, counts[blockid][woeid]))
-#    print "%s\t%s\t%s" % (blockid, woeid, counts[blockid][woeid])
+    cur.execute("""SELECT * FROM """ + VOTE_TABLE + """ WHERE id=%s AND label=%s AND source='flickr'""", (
+      blockid, woeid))
+    if len(cur.fetchall()) == 0:
+        cur = conn.cursor()
+        cur.execute("""INSERT INTO """ + VOTE_TABLE + """ (id, label, count, source) VALUES (%s, %s, %s, 'flickr');""", (
+          blockid, woeid, counts[blockid][woeid]))
+    else:
+        print 'already had row for flickr %s %s' % (blockid, woeid)
+
+    print "%s\t%s\t%s" % (blockid, woeid, counts[blockid][woeid])
     if (c % 1000) == 0:
       conn.commit()
 conn.commit()
