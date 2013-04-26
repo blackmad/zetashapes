@@ -23,9 +23,10 @@ def login():
 
     return render_template('login.html', form=LoginForm())
 
-@app.route('/editor')
-def editor():
-    return render_template('editor.html')
+
+@app.route('/editor/<areaid>')
+def editor(areaid=None):
+    return render_template('editor.html', areaid=areaid)
 
 @app.route('/register', methods=['GET', 'POST'])
 @app.route('/register/<provider_id>', methods=['GET', 'POST'])

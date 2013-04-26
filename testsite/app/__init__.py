@@ -18,7 +18,8 @@ app.secret_key = 'why would I tell you my secret key?'
 
 
 basedir = os.path.abspath('.')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'app.db')
+# app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'app.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres@localhost:5432/gis'
 db = SQLAlchemy(app)
 
 # Late import so modules can import their dependencies properly

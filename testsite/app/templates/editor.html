@@ -40,11 +40,10 @@
 
 	<script>
     $('.controlBox').button()
-    var areaid = window.location.hash.substr(1)
 
     $(
       new MapPage({
-        areaid: areaid
+        areaid: '{{ areaid }}'
       })
     );
 	</script>
