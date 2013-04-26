@@ -1,0 +1,21 @@
+COMMON: &common
+  SECRET_KEY: insecure1
+  SECURITY_POST_LOGIN_VIEW: '/profile'
+
+  SQLALCHEMY_DATABASE_URI = 'sqlite://./app.db'
+  ADMIN_CREDENTIALS: 'admin,password'
+
+  SECURITY_TRACKABLE: True
+  SOCIAL_CONNECT_ALLOW_VIEW: '/profile'
+  SOCIAL_APP_URL: http://flask-social-example.herokuapp.com/
+  URL: http://flask-social-example.herokuapp.com/
+
+DEVELOPMENT: &development
+  <<: *common
+  DEBUG: True
+
+PRODUCTION: &production
+  <<: *common
+  DEBUG: True
+  SECURITY_PASSWORD_HASH: bcrypt
+  SOCIAL_APP_URL: http://flask-social-example.herokuapp.com/

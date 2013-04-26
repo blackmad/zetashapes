@@ -1,0 +1,52 @@
+<!doctype html>
+<!--[if lt IE 7]> <html class="no-js lt-ie9 lt-ie8 lt-ie7" lang="en"> <![endif]-->
+<!--[if IE 7]>    <html class="no-js lt-ie9 lt-ie8" lang="en"> <![endif]-->
+<!--[if IE 8]>    <html class="no-js lt-ie9" lang="en"> <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en"> <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+  <title>Flask-Social Example {{ page_title }}</title>
+  <meta name="description" content="A working example of the Flask-Social extension for Flask, a web microframework written in Python">
+  <meta name="viewport" content="width=device-width">
+  <link href="/static/css/bootstrap.css" rel="stylesheet" media="screen">
+  <link href="/static/css/bootstrap.map.css" rel="stylesheet" media="screen">
+  <link href="/static/css/bootstrap-responsive.css" rel="stylesheet" media="screen">
+  <link rel="stylesheet" href="/static/css/leaflet.css" />
+  <!--[if lte IE 8]>
+      <link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet-0.5.1/leaflet.ie.css" />
+      <![endif]-->
+  <script src="/static/js/jquery-1.9.1.min.js"></script>
+  <script src="/static/js/leaflet.js"></script>
+  <script src="/static/js/underscore-min.js"></script>
+  <script src="/static/js/backbone.js"></script>
+  <script src="/static/js/editor.js"></script>
+
+  <script src="/static/js/bootstrap.min.js"></script>
+
+  {% if google_analytics_id %}
+  <script type="text/javascript">
+    var _gaq = _gaq || [];
+    _gaq.push(['_setAccount', '{{ google_analytics_id }}']);
+    _gaq.push(['_trackPageview']);
+    (function() {
+      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+    })();
+  </script>
+  {% endif %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  <!--[if lt IE 7]><p class=chromeframe>Your browser is <em>ancient!</em> <a href="http://browsehappy.com/">Upgrade to a different browser</a> or <a href="http://www.google.com/chromeframe/?redirect=true">install Google Chrome Frame</a> to experience this site.</p><![endif]-->
+  <div class="container">
+    {% include "_nav.html" %}
+    {% include "_messages.html" -%}
+    {% block layout %}{% endblock -%}
+    <footer class="footer">
+      <p>Copyright &copy; 2012 by Matt Wright</p>
+      <p>This site uses <a href="http://twitter.github.com/bootstrap/">Twitter Bootstrap</a>. You can also <a href="http://www.github.com/mattupstate/flask-social-example">view the source code.</a></p>
+    </footer>
+  </div>
+</body>
+</html>

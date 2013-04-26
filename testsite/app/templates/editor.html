@@ -1,0 +1,51 @@
+{% extends '/layouts/boilerplate.html' %}
+
+{% block body_class %}map{% endblock %}
+
+{% block layout %}
+    <div class="container-fluid">
+      <div class="row-fluid">
+        <div class="span9">
+          <div id="map"></div>
+        </div>
+        <div class="span3">
+          <div class="well">
+      'Polygon mode': <button type="button" id="polygonMode" class="btn btn-primary" data-loading-text="Off" data-toggle="button">On</button>
+        {%- if current_user.is_authenticated() -%}
+          you're logged in
+        {%- else -%}
+           you're not logged in
+        {%- endif -%}
+
+      <br/><br/>
+      <span id="neighborhoodInfo"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+<div class="modal hide fade" id="neighborhoodSelectModal">
+  <div class="modal-header">
+    <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+    <h3>Neighborhood Select</h3>
+  </div>
+  <div class="modal-body">
+    <p>Neighborhoods <select class="neighborhoodSelect"></select></p>
+  </div>
+  <div class="modal-footer">
+    <a href="#" class="btn closeButton">Close</a>
+    <a href="#" class="btn btn-primary saveButton">Save changes</a>
+  </div>
+</div>
+
+	<script>
+    $('.controlBox').button()
+    var areaid = window.location.hash.substr(1)
+
+    $(
+      new MapPage({
+        areaid: areaid
+      })
+    );
+	</script>
+{% endblock %}
