@@ -17,10 +17,8 @@ VOTE_TABLE = 'votes'
 
 conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
 
-counts = defaultdict(lambda: defaultdict(int))
-
-
 def process_file(input_file):
+    counts = defaultdict(lambda: defaultdict(int))
     c = 0
     for line in input_file:
       line = line.strip()
