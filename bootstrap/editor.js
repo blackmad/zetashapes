@@ -77,7 +77,7 @@ var MapPage = Backbone.View.extend({
 
   initialize: function() {
     this.idToLayerMap_ = {}
-    this.inPaintMode_ = false;
+    this.inPolygonMode_ = false;
     this.$selectedNeighborhoodSpan = $('#selectedNeighborhood');
 
     this.labels_ = {};
@@ -122,8 +122,8 @@ var MapPage = Backbone.View.extend({
     });
   },
 
-  inPaintMode: function() {
-    return this.inPaintMode_;
+  inPolygonMode: function() {
+    return this.inPolygonMode_;
   },
 
   highlightBlocks: function(blockIdsResponse) {
@@ -162,7 +162,7 @@ var MapPage = Backbone.View.extend({
   processDoubleClick: function(e) { 
     console.log('dblclick')
     console.log(e)
-    if (this.inPaintMode()) {
+    if (this.inPolygonMode()) {
       console.log('in paint mode')
       if (this.currentPaintLine_) {
         this.highlightBlocksByGeometry(this.currentPaintLine_.getLatLngs())
@@ -179,7 +179,7 @@ var MapPage = Backbone.View.extend({
   processClick: function(e) { 
     console.log('click')
     console.log(e)
-    if (this.inPaintMode()) {
+    if (this.inPolygonMode()) {
       console.log('in paint mode')
       if (this.currentPaintLine_) {
         var lastIndex = this.currentPaintLine_.getLatLngs().length - 1
@@ -201,15 +201,15 @@ var MapPage = Backbone.View.extend({
     L.DomEvent.stopPropagation(e);
   },
 
-  togglePaintMode: function() {
-    this.inPaintMode_ = !this.inPaintMode_;
+  togglePolygonMode: function() {
+    this.inPolygonMode_ = !this.inPolygonMode_;
   },
 
   renderData: function(geojson) {
 	var map = L.map('map', {dragging: true}).setView([40.74, -74], 13);
-    this.$paintMode = $('#paintMode')
-    this.$paintMode.button();
-    this.$paintMode.click(_.bind(this.togglePaintMode, this))
+    this.$polygonMode = $('#polygonMode')
+    this.$polygonMode.button();
+    this.$polygonMode.click(_.bind(this.togglePolygonMode, this))
 
     this.map_ = map;
     this.map_.doubleClickZoom.disable(); 
@@ -259,7 +259,7 @@ var MapPage = Backbone.View.extend({
 
     map.on('mousemove', _.bind(function(e) {
         // console.log(e)
-        if (this.inPaintMode()) {
+        if (this.inPolygonMode()) {
           if (this.currentPaintLine_) {
             var lastIndex = this.currentPaintLine_.getLatLngs().length - 1
             this.currentPaintLine_.spliceLatLngs(lastIndex, 1, cloneLatLng(e.latlng));
@@ -284,7 +284,7 @@ var MapPage = Backbone.View.extend({
           });
 
     map.on('dblclick',  _.bind(function(e) {
-      if (this.inPaintMode()) {
+      if (this.inPolygonMode()) {
         this.startedPainting_ = true
       }
     }, this));
@@ -297,7 +297,7 @@ var MapPage = Backbone.View.extend({
     map.on('mouseup', _.bind(function(e) {
       console.log('mousedown')
       console.log(e)
-      if (this.inPaintMode()) {
+      if (this.inPolygonMode()) {
         this.startedPainting_ = false
       }
 
