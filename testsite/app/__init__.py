@@ -9,6 +9,7 @@ from flask.ext.sqlalchemy import SQLAlchemy
 from .helpers import Flask
 from .middleware import MethodRewriteMiddleware
 import os
+import flask_gzip
 
 
 app = Flask(__name__)
@@ -16,6 +17,7 @@ app.config.from_yaml(app.root_path)
 app.wsgi_app = MethodRewriteMiddleware(app.wsgi_app)
 app.secret_key = 'why would I tell you my secret key?'
 
+flask_gzip.Gzip(app)
 
 basedir = os.path.abspath('.')
 # app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'app.db')

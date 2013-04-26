@@ -19,8 +19,6 @@ function cloneLatLng(ll) {
   return new L.LatLng(ll.lat, ll.lng);
 };
 
-var host = "http://192.73.238.76:5000";
- 
 var MapPage = Backbone.View.extend({
   promptModal: function() {
     modalEl = $('#neighborhoodSelectModal')
@@ -86,7 +84,7 @@ var MapPage = Backbone.View.extend({
 
     $.ajax({
       dataType: "json",
-      url: host + "/labels?callback=?",
+      url: "/api/labels?callback=?",
       data: { areaid: this.options.areaid },
       success: _.bind(this.storeLabels, this)
     })
@@ -102,7 +100,7 @@ var MapPage = Backbone.View.extend({
     console.log('fetching ' + areaid)
     $.ajax({
       dataType: "json",
-      url: host + "/citydata?callback=?",
+      url: "/api/citydata?callback=?",
       data: { areaid: areaid },
       success: _.bind(this.renderData, this)
     })
@@ -152,7 +150,7 @@ var MapPage = Backbone.View.extend({
     console.log('firing off highlight blocks')
     $.ajax({
       dataType: "json",
-      url: host + "/blocksByGeom?callback=?",
+      url: "/api/blocksByGeom?callback=?",
       data: { ll: lls },
       success: _.bind(this.highlightBlocks, this)
     })
