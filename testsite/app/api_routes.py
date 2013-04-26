@@ -10,6 +10,9 @@ import psycopg2.extras
 from collections import defaultdict
 from . import app, db
 
+# start using sqlalchemy cursor
+conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
+
 def support_jsonp(f):
     """Wraps JSONified output for JSONP"""
     @wraps(f)

@@ -25,7 +25,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres@localhost:5432/gi
 db = SQLAlchemy(app)
 
 # Late import so modules can import their dependencies properly
-from . import models, views
+from . import models, views, api_routes
 
 
 security_ds = SQLAlchemyUserDatastore(db, models.User, models.Role)
