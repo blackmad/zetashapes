@@ -71,7 +71,8 @@ def citydata():
   cur.execute("""select geoid10, ST_AsGeoJSON(ST_Transform(geom, 4326)) as geojson_geom FROM tabblock10 tb WHERE statefp10 = %s AND countyfp10 = %s""", (statefp10, countyfp10))
   rows = cur.fetchall()
 
-  cur.execute("""select id, label, count, source, name FROM votes v JOIN geoplanet_places ON label::int = woe_id WHERE statefp10 = %s AND countyfp10 = %s""",(statefp10, countyfp10))
+  print cur.mogrify("""select id, label, count, source, name FROM votes v JOIN geoplanet_places ON label::int = woe_id WHERE id LIKE '%s%%'""" % (areaid))
+  cur.execute("""select id, label, count, source, name FROM votes v JOIN geoplanet_places ON label::int = woe_id WHERE id LIKE '%s%%'""" % (areaid))
   votes = defaultdict(list)
   for r in cur.fetchall():
     votes[r['id']].append({

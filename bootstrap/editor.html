@@ -1,59 +1,14 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <style>
-html {
-    margin: 0px;
-    height: 100%;
-}
-
-#contentPane {
-margin-top:60px
-}
-
-body { margin: 0px;
-    height: 100%;}
-
-#wrap {
-    height: 100%;
-    padding-left: 10px;
-    padding-right: 10px;
-
-}
-#map {
-width:100%;
-height:600px;
-}
-#controlBox {
-  position: fixed;
-top:4px;
-left:59px;
-
-        padding: 10px;
-        -webkit-border-radius: 15px;
-        -moz-border-radius: 15px;
-        border-radius: 15px;
-
-background: #E9EAEE;
-border: 2px solid white;
-margin: 0 auto;
-box-shadow: 1px 2px 6px rgba(0, 0, 0, 0.5);
--moz-box-shadow: 1px 2px 6px rgba(0,0,0, 0.5);
--webkit-box-shadow: 1px 2px 6
-
-        z-index: 50;
-        background: white;
-        width: 170px;
-        /* height: 440 px; */
-
-}
-</style>
 	<title>Leaflet Layers Control Example</title>
 	<meta charset="utf-8" />
 
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <link href="css/bootstrap.min.css" rel="stylesheet" media="screen">
+  <link href="css/bootstrap.css" rel="stylesheet" media="screen">
+  <link href="css/bootstrap.map.css" rel="stylesheet" media="screen">
+  <link href="css/bootstrap-responsive.css" rel="stylesheet" media="screen">
   <link rel="stylesheet" href="css/leaflet.css" />
   <!--[if lte IE 8]>
       <link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet-0.5.1/leaflet.ie.css" />
@@ -67,51 +22,41 @@ box-shadow: 1px 2px 6px rgba(0, 0, 0, 0.5);
   <script src="editor.js"></script>
 
 </head>
-<body>
+<body class="map">
   <script src="js/bootstrap.min.js"></script>
-
-<!--
-    <div class="navbar navbar-inverse navbar-fixed-top">
+    <div class="navbar">
       <div class="navbar-inner">
         <div class="container">
-          <button type="button" class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+            <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
             <span class="icon-bar"></span>
             <span class="icon-bar"></span>
             <span class="icon-bar"></span>
-          </button>
-          <a class="brand" href="#">Project name</a>
-          <div class="nav-collapse collapse">
+          </a>
+          <a class="brand" href="#">the-neighborhood-project</a>
+          <div class="nav-collapse">
             <ul class="nav">
-              <li class="active"><a href="#">Home</a></li>
-              <li><a href="#about">About</a></li>
-              <li><a href="#contact">Contact</a></li>
+              <li>1</li>
+              <li class="active">2</li>
             </ul>
           </div>
         </div>
       </div>
     </div>
--->
 
-        <div class="container" id="contentPane">
-            <div class="row main-row">
-                <div class="span12">
-                    <div class="row">
-                        <div id="data" class="span2 pull-left">
-                            <div class="overview">
-this is the control box
+    <div class="container-fluid">
+      <div class="row-fluid">
+        <div class="span9">
+          <div id="map"></div>
+        </div>
+        <div class="span3">
+          <div class="well">
+      this is the control box
       'Paint mode': <button type="button" id="paintMode" class="btn btn-primary" data-loading-text="Off" data-toggle="button">On</button>
       <span id="neighborhoodInfo"></span>
-
-                            </div>
-                        </div>
-                        <div id="map-area" class="span10 pull-right">
-                            <div id="map"></div>
-                        </div>
-                    </div>
-                </div><!-- end of main row -->
-            </div>
-
-        </div><!-- /container -->
+          </div>
+        </div>
+      </div>
+    </div>
 
 <div class="modal hide fade" id="neighborhoodSelectModal">
   <div class="modal-header">
