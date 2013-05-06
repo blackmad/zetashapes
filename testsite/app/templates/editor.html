@@ -11,6 +11,7 @@
         <div class="span3">
           <div class="well">
       'Polygon mode': <button type="button" id="polygonMode" class="btn btn-primary" data-loading-text="Off" data-toggle="button">On</button>
+      <br/>
         {%- if current_user.is_authenticated() -%}
           you're logged in
         {%- else -%}
@@ -30,10 +31,13 @@
     <h3>Neighborhood Select</h3>
   </div>
   <div class="modal-body">
-    <p>Neighborhoods <select class="neighborhoodSelect"></select></p>
+    <div class="neighborhoodChoices"></div>
+    <div class="ui-widget">
+      <p>Other: <select class="neighborhoodSelect"></select></p>
+    </div>
   </div>
   <div class="modal-footer">
-    <a href="#" class="btn closeButton">Close</a>
+    <a href="#" class="btn closeButton">Cancel</a>
     <a href="#" class="btn btn-primary saveButton">Save changes</a>
   </div>
 </div>
@@ -43,7 +47,8 @@
 
     $(
       new MapPage({
-        areaid: '{{ areaid }}'
+        areaid: '{{ areaid }}',
+        api_key: '{{current_user.api_key }}'
       })
     );
 	</script>

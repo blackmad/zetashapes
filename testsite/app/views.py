@@ -10,6 +10,8 @@ from .forms import RegisterForm
 from .models import User
 from .tools import requires_auth
 
+import random
+import string
 
 @app.route('/')
 def index():
@@ -47,6 +49,10 @@ def register(provider_id=None):
     if form.validate_on_submit():
         ds = current_app.security.datastore
         user = ds.create_user(email=form.email.data, password=form.password.data)
+
+        char_set = string.ascii_uppercase + string.digits
+        user.api_key = ''.join(random.sample(char_set*32,32))
+
         ds.commit()
 
         # See if there was an attempted social login prior to registering

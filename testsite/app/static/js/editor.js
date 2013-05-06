@@ -1,17 +1,23 @@
-// TODO
-// add recolor tool
-// add paint tool
-// add polygon tool
-// add box tool
-// actually call the api to get this
-// actually call the api to send this
-// ability to modify neighborhood names
-// ability to change weightings
-// move vote to a model
+/* TODO
+--submit votes
+--undo?
+--show other info
 
-// server-side:
-// filter out water
-// add "smoothing" votes
+
+--make blocks into a model
+--enable voting
+--build paint mode
+--ability to add/delete hoods
+--build undo
+--fix combobox dropdown
+--make a real homepage?
+--state -> county index pages?
+--lock editing without login
+
+server side:
+--more filter out water
+--add "smoothing" votes
+*/
 
 var colors = [ "Aqua","Aquamarine","Bisque","Black","BlanchedAlmond","Blue","BlueViolet","Brown","BurlyWood","CadetBlue","Chartreuse","Chocolate","Coral","CornflowerBlue","Cornsilk","Crimson","Cyan","DarkBlue","DarkCyan","DarkGoldenRod","DarkGray","DarkGreen","DarkKhaki","DarkMagenta","DarkOliveGreen","Darkorange","DarkOrchid","DarkRed","DarkSalmon","DarkSeaGreen","DarkSlateBlue","DarkSlateGray","DarkTurquoise","DarkViolet","DeepPink","DeepSkyBlue","DimGray","DimGrey","DodgerBlue","FireBrick","ForestGreen","Fuchsia","Gainsboro","Gold","GoldenRod","Gray","Green","GreenYellow","HotPink","IndianRed","Indigo","Ivory","Khaki","Lavender","LavenderBlush","LawnGreen","LemonChiffon","LightBlue","LightCoral","LightCyan","LightGoldenRodYellow","LightGray","LightGreen","LightPink","LightSalmon","LightSeaGreen","LightSkyBlue","LightSlateGray","LightSteelBlue","Lime","LimeGreen","Linen","Magenta","Maroon","MediumAquaMarine","MediumBlue","MediumOrchid","MediumPurple","MediumSeaGreen","MediumSlateBlue","MediumSpringGreen","MediumTurquoise","MediumVioletRed","MidnightBlue","MistyRose","Moccasin","Navy","Olive","OliveDrab","Orange","OrangeRed","Orchid","PaleGoldenRod","PaleGreen","PaleTurquoise","PaleVioletRed","PapayaWhip","PeachPuff","Peru","Pink","Plum","PowderBlue","Purple","Red","RosyBrown","RoyalBlue","SaddleBrown","Salmon","SandyBrown","SeaGreen","Sienna","Silver","SkyBlue","SlateBlue","SlateGray","Snow","SpringGreen","SteelBlue","Tan","Teal","Thistle","Tomato","Turquoise","Violet","Wheat","Yellow","YellowGreen" ]
 
@@ -21,12 +27,54 @@ function cloneLatLng(ll) {
 
 var MapPage = Backbone.View.extend({
   promptModal: function() {
-    modalEl = $('#neighborhoodSelectModal')
-    modalEl.modal();
-    modalEl.find($('.closeButton')).on('click', function() {
-      modalEl.modal('toggle');
-    })
+    var idToLabelMap = {}
+    var selectedIds = _.chain(this.lastHighlightedBlocks_)
+      .map(function(e) {
+        return _.map(e.feature.properties['votes'], function(f) {
+          idToLabelMap[f['id']] = f['label'];
+          return f['id'];
+        })
+      })
+      .flatten()
+      .uniq()
+      .value()
+    console.log(selectedIds);
 
+    modalEl = $('#neighborhoodSelectModal')
+
+    modalEl.on('show', function (e) {
+      var select = $('.neighborhoodSelect');
+      select.combobox();
+    });
+
+    modalEl.modal();
+
+    var choicesEl = modalEl.find('.neighborhoodChoices')
+
+    _.each(selectedIds, _.bind(function(id) {
+      console.log(id);
+      console.log(idToLabelMap);
+
+      console.log(idToLabelMap[id]);
+      var choiceDiv = $('<div class="choice"></div>');
+      choicesEl.append(choiceDiv);
+      $('<a>',{
+        text: idToLabelMap[id],
+        title: idToLabelMap[id],
+        href: '#',
+        click: function() { console.log('picked ' + id); }
+      }).appendTo(choiceDiv);
+    }));
+
+    modalEl.find($('.closeButton')).on('click', function() {
+      modalEl.modal('hide');
+    });
+
+    modalEl.find($('.saveButton')).on('click', _.bind(function() {
+      console.log('save called');
+      var selectedHoodId = $('.neighborhoodSelect').val();
+      modalEl.modal('hide');
+    }, this));
   },
     
   calculateBestVote: function(feature) {
@@ -165,6 +213,7 @@ var MapPage = Backbone.View.extend({
       if (this.currentPaintLine_) {
         this.highlightBlocksByGeometry(this.currentPaintLine_.getLatLngs())
         this.currentPaintLine_ = null;
+        this.promptModal();
       }
     } 
     L.DomEvent.stopPropagation(e);
@@ -190,6 +239,7 @@ var MapPage = Backbone.View.extend({
           this.currentPaintLine_.spliceLatLngs(lastIndex, 1, cloneLatLng(e.latlng), cloneLatLng(e.latlng));
         }
       } else {
+        this.lastHighlightedBlocks_ = [];
         this.currentPaintLine_ = new L.Polygon([cloneLatLng(e.latlng), cloneLatLng(e.latlng)]);
         this.map_.addLayer(this.currentPaintLine_);
       }
@@ -309,6 +359,10 @@ var MapPage = Backbone.View.extend({
         color: 'red',
         opacity: 1.0
       });
+      
+      if (!this.inPolygonMode()) {
+        this.lastHighlightedBlocks_ = [ e.layer ];
+      }  
 
       $('#neighborhoodInfo').html(
         "id<br>" +

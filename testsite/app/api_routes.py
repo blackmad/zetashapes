@@ -9,6 +9,9 @@ import psycopg2
 import psycopg2.extras
 from collections import defaultdict
 from . import app, db
+import os
+
+TMP_DIR = '/tmp'
 
 # start using sqlalchemy cursor
 conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
@@ -51,7 +54,7 @@ def blocksByArea():
     wkt = 'POLYGON((%s))' % ll
   print wkt
 
-  comm = cur.mogrify("""select geoid10 FROM tabblock10 tb WHERE ST_Intersects(geom, ST_Transform(ST_GeomFromText(%s, 4326), 4326))""", (wkt,))
+  comm = cur.mogrify("""select geoid10 FROM tabblock10 tb WHERE ST_Intersects(geom, ST_Transform(ST_GeomFromText(%s, 4326), 4326)) AND blockce10 NOT LIKE '0%%'""", (wkt,))
   print(comm)
   cur.execute(comm)
   rows = cur.fetchall()
@@ -68,16 +71,15 @@ def citydata():
   statefp10 = areaid[0:2]
   countyfp10 = areaid[2:]
 
-  cur.execute("""select geoid10, ST_AsGeoJSON(ST_Transform(geom, 4326)) as geojson_geom FROM tabblock10 tb WHERE statefp10 = %s AND countyfp10 = %s""", (statefp10, countyfp10))
+  cur.execute("""select geoid10, ST_AsGeoJSON(ST_Transform(geom, 4326)) as geojson_geom FROM tabblock10 tb WHERE statefp10 = %s AND countyfp10 = %s AND blockce10 NOT LIKE '0%%'""", (statefp10, countyfp10))
   rows = cur.fetchall()
 
-  print cur.mogrify("""select id, label, count, source, name FROM votes v JOIN geoplanet_places ON label::int = woe_id WHERE id LIKE '%s%%'""" % (areaid))
-  cur.execute("""select id, label, count, source, name FROM votes v JOIN geoplanet_places ON label::int = woe_id WHERE id LIKE '%s%%'""" % (areaid))
+  cur.execute("""select woe_id, id, label, count, source, name FROM votes v JOIN geoplanet_places ON label::int = woe_id WHERE id LIKE '%s%%'""" % (areaid))
   votes = defaultdict(list)
   for r in cur.fetchall():
     votes[r['id']].append({
       'label': r['name'], 
-      'id': r['id'], 
+      'id': r['woe_id'], 
       'count': r['count'], 
       'source': r['source']
     })
@@ -99,7 +101,8 @@ def labels():
   statefp10 = areaid[0:2]
   countyfp10 = areaid[2:]
 
-  cur.execute("""select distinct(label, name) FROM votes v JOIN geoplanet_places ON label::int = woe_id WHERE statefp10 = %s AND countyfp10 = %s""",(statefp10, countyfp10))
+  cur.execute("""select distinct(label, name) FROM votes v JOIN geoplanet_places ON label::int = woe_id WHERE id LIKE '%s%%'""" % (areaid))
+
   rows = cur.fetchall()
 
   response = []

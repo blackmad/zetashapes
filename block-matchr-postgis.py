@@ -33,8 +33,8 @@ def process_file(input_file):
         cur.execute("""SELECT %s FROM "%s" WHERE ST_CONTAINS(geom, ST_Transform(ST_GeomFromText('POINT(%s %s)', %s), %s))""" % (ID_COL, TABLE, lon, lat, FROM_SRID, TABLE_SRID))
         rows = cur.fetchall()
 
-        if len(rows) == 0:
-          print "no blocks found for %s %s" % (lat, lon)
+        #if len(rows) == 0:
+        #  print "no blocks found for %s %s" % (lat, lon)
 
         for row in rows:
           counts[row[0]][id] += 1
