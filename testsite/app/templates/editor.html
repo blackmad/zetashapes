@@ -10,12 +10,11 @@
         </div>
         <div class="span3">
           <div class="well">
-      'Polygon mode': <button type="button" id="polygonMode" class="btn btn-primary" data-loading-text="Off" data-toggle="button">On</button>
       <br/>
         {%- if current_user.is_authenticated() -%}
-          you're logged in
+          'Polygon mode': <button type="button" id="polygonMode" class="btn btn-primary" data-loading-text="Off" data-toggle="button">On</button>
         {%- else -%}
-           you're not logged in
+           If you want to edit the map, please <a href="/login">login</a>
         {%- endif -%}
 
       <br/><br/>

@@ -1,36 +1,48 @@
-/* TODO
---submit votes
---undo?
---show other info
-
-
---make blocks into a model
---enable voting
---build paint mode
---ability to add/delete hoods
---build undo
---fix combobox dropdown
---make a real homepage?
---state -> county index pages?
---lock editing without login
-
-server side:
---more filter out water
---add "smoothing" votes
-
-
-gis=# alter table votes add foreign key (label) references geoplanet_places(woe_id);
-ERROR:  insert or update on table "votes" violates foreign key constraint "votes_label_fkey"
-DETAIL:  Key (label)=(23417225) is not present in table "geoplanet_places".
-*/
-
-var colors = [ "Aqua","Aquamarine","Bisque","Black","BlanchedAlmond","Blue","BlueViolet","Brown","BurlyWood","CadetBlue","Chartreuse","Chocolate","Coral","CornflowerBlue","Cornsilk","Crimson","Cyan","DarkBlue","DarkCyan","DarkGoldenRod","DarkGray","DarkGreen","DarkKhaki","DarkMagenta","DarkOliveGreen","Darkorange","DarkOrchid","DarkRed","DarkSalmon","DarkSeaGreen","DarkSlateBlue","DarkSlateGray","DarkTurquoise","DarkViolet","DeepPink","DeepSkyBlue","DimGray","DimGrey","DodgerBlue","FireBrick","ForestGreen","Fuchsia","Gainsboro","Gold","GoldenRod","Gray","Green","GreenYellow","HotPink","IndianRed","Indigo","Ivory","Khaki","Lavender","LavenderBlush","LawnGreen","LemonChiffon","LightBlue","LightCoral","LightCyan","LightGoldenRodYellow","LightGray","LightGreen","LightPink","LightSalmon","LightSeaGreen","LightSkyBlue","LightSlateGray","LightSteelBlue","Lime","LimeGreen","Linen","Magenta","Maroon","MediumAquaMarine","MediumBlue","MediumOrchid","MediumPurple","MediumSeaGreen","MediumSlateBlue","MediumSpringGreen","MediumTurquoise","MediumVioletRed","MidnightBlue","MistyRose","Moccasin","Navy","Olive","OliveDrab","Orange","OrangeRed","Orchid","PaleGoldenRod","PaleGreen","PaleTurquoise","PaleVioletRed","PapayaWhip","PeachPuff","Peru","Pink","Plum","PowderBlue","Purple","Red","RosyBrown","RoyalBlue","SaddleBrown","Salmon","SandyBrown","SeaGreen","Sienna","Silver","SkyBlue","SlateBlue","SlateGray","Snow","SpringGreen","SteelBlue","Tan","Teal","Thistle","Tomato","Turquoise","Violet","Wheat","Yellow","YellowGreen" ]
+var colors = [ 'Aqua','Aquamarine','Bisque','Black','BlanchedAlmond','Blue','BlueViolet','Brown','BurlyWood','CadetBlue','Chartreuse','Chocolate','Coral','CornflowerBlue','Cornsilk','Crimson','Cyan','DarkBlue','DarkCyan','DarkGoldenRod','DarkGray','DarkGreen','DarkKhaki','DarkMagenta','DarkOliveGreen','Darkorange','DarkOrchid','DarkRed','DarkSalmon','DarkSeaGreen','DarkSlateBlue','DarkSlateGray','DarkTurquoise','DarkViolet','DeepPink','DeepSkyBlue','DimGray','DimGrey','DodgerBlue','FireBrick','ForestGreen','Fuchsia','Gainsboro','Gold','GoldenRod','Gray','Green','GreenYellow','HotPink','IndianRed','Indigo','Ivory','Khaki','Lavender','LavenderBlush','LawnGreen','LemonChiffon','LightBlue','LightCoral','LightCyan','LightGoldenRodYellow','LightGray','LightGreen','LightPink','LightSalmon','LightSeaGreen','LightSkyBlue','LightSlateGray','LightSteelBlue','Lime','LimeGreen','Linen','Magenta','Maroon','MediumAquaMarine','MediumBlue','MediumOrchid','MediumPurple','MediumSeaGreen','MediumSlateBlue','MediumSpringGreen','MediumTurquoise','MediumVioletRed','MidnightBlue','MistyRose','Moccasin','Navy','Olive','OliveDrab','Orange','OrangeRed','Orchid','PaleGoldenRod','PaleGreen','PaleTurquoise','PaleVioletRed','PapayaWhip','PeachPuff','Peru','Pink','Plum','PowderBlue','Purple','Red','RosyBrown','RoyalBlue','SaddleBrown','Salmon','SandyBrown','SeaGreen','Sienna','Silver','SkyBlue','SlateBlue','SlateGray','Snow','SpringGreen','SteelBlue','Tan','Teal','Thistle','Tomato','Turquoise','Violet','Wheat','Yellow','YellowGreen' ]
 
 function cloneLatLng(ll) {
   return new L.LatLng(ll.lat, ll.lng);
 };
 
 var MapPage = Backbone.View.extend({
+  recolorBlocks: function(blocks) {
+    _.each(blocks, _.bind(function(block) {
+      this.colorFeature(block.feature, block);
+    }, this));
+
+  },
+
+  unhighlightPolygon: function() {
+    if (this.currentPaintLine_) {
+      this.map_.removeLayer(this.currentPaintLine_);
+      this.recolorBlocks(this.lastHighlightedBlocks_);
+      this.currentPaintLine_ = null;
+    }
+  },
+
+  doVote: function(blockids, selectedHoodId) {
+  // submit the votes
+    $.ajax({
+      dataType: 'json',
+      url: '/api/vote',
+      data: { 
+        key: this.apiKey_,
+        blockid: blockids.join(','),
+        label: selectedHoodId
+      },
+      success: function() {
+        window.console.log('your labels were successfully submitted');
+      }
+    })
+  },
+
+  getCurrentBlockIds: function() {
+    var blockids = _.map(this.lastHighlightedBlocks_, function(f) {
+      return f.feature['properties']['id'];
+    });
+    return blockids;
+  },
+
   promptModal: function() {
     var idToLabelMap = {}
     var selectedIds = _.chain(this.lastHighlightedBlocks_)
@@ -67,9 +79,17 @@ var MapPage = Backbone.View.extend({
         text: idToLabelMap[id],
         title: idToLabelMap[id],
         href: '#',
-        click: function() { console.log('picked ' + id); }
+        click: _.bind(function() { 
+          this.doVote(this.getCurrentBlockIds(), id);
+          modalEl.modal('hide');
+        }, this)
       }).appendTo(choiceDiv);
-    }));
+    }, this));
+
+    modalEl.on('hidden', _.bind(function() {
+      console.log('hidding!!!!');
+      this.unhighlightPolygon();
+    }, this));
 
     modalEl.find($('.closeButton')).on('click', function() {
       modalEl.modal('hide');
@@ -78,6 +98,8 @@ var MapPage = Backbone.View.extend({
     modalEl.find($('.saveButton')).on('click', _.bind(function() {
       console.log('save called');
       var selectedHoodId = $('.neighborhoodSelect').val();
+      this.doVote(this.getCurrentBlockIds(), selectedHoodId);
+ 
       modalEl.modal('hide');
     }, this));
   },
@@ -133,11 +155,12 @@ var MapPage = Backbone.View.extend({
 
     this.labels_ = {};
     this.labelColors_ = {};
+    this.apiKey_ = this.options.api_key;
     console.log(this.options);
 
     $.ajax({
-      dataType: "json",
-      url: "/api/labels?callback=?",
+      dataType: 'json',
+      url: '/api/labels?callback=?',
       data: { areaid: this.options.areaid },
       success: _.bind(this.storeLabels, this)
     })
@@ -152,18 +175,18 @@ var MapPage = Backbone.View.extend({
   fetchData: function(areaid) {
     console.log('fetching ' + areaid)
     $.ajax({
-      dataType: "json",
-      url: "/api/citydata?callback=?",
+      dataType: 'json',
+      url: '/api/citydata?callback=?',
       data: { areaid: areaid },
       success: _.bind(this.renderData, this)
     })
   },
 
   colorFeature: function(feature, layer) {
-    var popupContent = "id: " + feature.properties.id + " <br>label: " + this.calculateBestLabel(feature) + " <br>color: " + this.calculateColor(feature) +  "<br><br>";
+    var popupContent = 'id: ' + feature.properties.id + ' <br>label: ' + this.calculateBestLabel(feature) + ' <br>color: ' + this.calculateColor(feature) +  '<br><br>';
 
     if (feature.properties) {
-      popupContent += "<pre>" + JSON.stringify(feature.properties) + "</pre>";
+      popupContent += '<pre>' + JSON.stringify(feature.properties) + '</pre>';
     }
 
     layer.setStyle({
@@ -178,9 +201,7 @@ var MapPage = Backbone.View.extend({
   },
 
   highlightBlocks: function(blockIdsResponse) {
-    _.each(this.lastHighlightedBlocks_, _.bind(function(block) {
-      this.colorFeature(block.feature, block);
-    }, this));
+    this.recolorBlocks(this.lastHighlightedBlocks_);
 
     var blocks = _.map(blockIdsResponse['ids'], _.bind(function(id) {
       return this.idToLayerMap_[id];
@@ -199,11 +220,11 @@ var MapPage = Backbone.View.extend({
   },
 
   highlightBlocksByGeometry: function(latlngs) {
-    var lls = _.map(latlngs.concat([latlngs[0]]), function(ll) { return ll.lng + " " + ll.lat }).join(',')
+    var lls = _.map(latlngs.concat([latlngs[0]]), function(ll) { return ll.lng + ' ' + ll.lat }).join(',')
     console.log('firing off highlight blocks')
     $.ajax({
-      dataType: "json",
-      url: "/api/blocksByGeom?callback=?",
+      dataType: 'json',
+      url: '/api/blocksByGeom?callback=?',
       data: { ll: lls },
       success: _.bind(this.highlightBlocks, this)
     })
@@ -217,7 +238,6 @@ var MapPage = Backbone.View.extend({
       console.log('in paint mode')
       if (this.currentPaintLine_) {
         this.highlightBlocksByGeometry(this.currentPaintLine_.getLatLngs())
-        this.currentPaintLine_ = null;
         this.promptModal();
       }
     } 
@@ -370,9 +390,9 @@ var MapPage = Backbone.View.extend({
       }  
 
       $('#neighborhoodInfo').html(
-        "id<br>" +
+        'id<br>' +
         e.layer.feature.properties.id +
-        "<br>label<br>" +
+        '<br>label<br>' +
         this.calculateBestLabel(e.layer.feature)
       );
     }, this));

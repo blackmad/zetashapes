@@ -41,7 +41,6 @@
       },
  
       _createShowAllButton: function() {
-        debugger;
         var input = this.input,
           wasOpen = false;
  

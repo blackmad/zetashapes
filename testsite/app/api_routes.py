@@ -47,6 +47,20 @@ def makeFeature(row, voteDict):
 def makeFeatures(rows, voteDict):
   return [makeFeature(r, voteDict) for r in rows]
 
+@app.route('/api/stateCounts', methods=['GET'])
+@support_jsonp
+def stateCounts():
+  cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+  cur.execute("""select areaid, count, name10  FROM area_counts JOIN tl_2010_us_state10 ON areaid = geoid10 where char_length(areaid) = 2""")
+  rows = cur.fetchall()
+  ret = {}
+  for r in rows:
+    ret[r['areaid']] = {
+      'name': r['name10'],
+      'count': r['count']
+    }
+  return jsonify(ret)
+
 @app.route('/api/blocksByGeom', methods=['GET'])
 @support_jsonp
 def blocksByArea():
@@ -80,6 +94,7 @@ def citydata():
   rows = cur.fetchall()
 
   cur.execute("""select woe_id, id, label, count, source, name FROM votes v JOIN geoplanet_places ON label::int = woe_id WHERE id LIKE '%s%%'""" % (areaid))
+
   votes = defaultdict(list)
   for r in cur.fetchall():
     votes[r['id']].append({
@@ -88,6 +103,20 @@ def citydata():
       'count': r['count'], 
       'source': r['source']
     })
+ 
+  apikey = request.args.get('key', '')
+  user_votes = {}
+  if apikey:
+    user = findUserByApiKey(apikey)
+    userId = user['id']
+    cur.execute("""select woe_id, blockid, name FROM user_votes v JOIN geoplanet_places ON label::int = woe_id WHERE v.userid = %s AND v.blockid LIKE '%s%%'""" % (userId, areaid))
+    for r in cur.fetchall():
+      votes[r['id']].append({
+        'label': r['name'], 
+        'id': r['woe_id'], 
+        'source': self,
+        'count': 1
+      })
 
   response = {
     "type": "FeatureCollection",
@@ -139,19 +168,28 @@ def modifyUsersVoteCount(cur, blockid, woeid, incr):
 @support_jsonp
 def do_vote():
   cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-
-  votes = request.args.get('votes', '')
-  apikey = request.args.get('key', '')
-
-  # votes are in the form blockid,woeid;blockid,woeid;...
+ 
   votepairs = []
-  for votepair in votes.split(';'):
-    print votepair
-    print votepair.split(',')
-    blockid = votepair.split(',')[0]
-    woeid = int(votepair.split(',')[1])
-    votepairs.append((blockid, woeid))
+  
+  blockid = request.args.get('blockid', '')
+  label = request.args.get('label', '')
+  if blockid and label:
+    blockids = blockid.split(',')
+    for id in blockids:
+      votepairs.append((id, label))
+  else:
+    votes = request.args.get('votes', '')
 
+    # votes are in the form blockid,woeid;blockid,woeid;...
+    for votepair in votes.split(';'):
+      print votepair
+      print votepair.split(',')
+      blockid = votepair.split(',')[0]
+      woeid = int(votepair.split(',')[1])
+      votepairs.append((blockid, woeid))
+  print votepairs
+
+  apikey = request.args.get('key', '')
   user = findUserByApiKey(apikey)
   userId = user['id']
 
@@ -209,8 +247,4 @@ def do_vote():
     # if it's for a different block
     # --ugh, see if there's an existing user votes row for new block, if there is, increment it, if not, create it
     # existing user votes row should exist, so just decrement it
-
-#    cur = conn.cursor()
-#    cur.execute("""UPDATE votes SET label=%s, count=%s, source=%s WHERE id=%s AND source='flickr' AND label=%s""", (
-#      woeid, counts[blockid][woeid], blockid, woeid))
-  # return jsonify({'labels': response})
+  return jsonify({})

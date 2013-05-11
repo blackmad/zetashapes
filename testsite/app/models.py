@@ -23,6 +23,7 @@ class User(db.Model, UserMixin):
     __tablename__ = "users"
 
     id = db.Column(db.Integer, primary_key=True)
+    level = db.Column(db.Integer, default=0)
     email = db.Column(db.String(255), unique=True)
     password = db.Column(db.String(120))
     active = db.Column(db.Boolean())
