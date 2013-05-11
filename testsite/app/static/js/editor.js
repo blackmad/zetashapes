@@ -21,6 +21,16 @@ var MapPage = Backbone.View.extend({
   },
 
   doVote: function(blockids, selectedHoodId) {
+    _.each(blockids, _.bind(function(blockid) {
+        this.idToLayerMap_[blockid].feature.properties['votes'].push(
+        {
+          count: 1,
+          source: 'self',
+          label: selectedHoodId
+        })
+      }, this)
+    );
+
   // submit the votes
     $.ajax({
       dataType: 'json',
@@ -177,7 +187,10 @@ var MapPage = Backbone.View.extend({
     $.ajax({
       dataType: 'json',
       url: '/api/citydata?callback=?',
-      data: { areaid: areaid },
+      data: {
+        areaid: areaid,
+        key: this.apiKey_,
+      },
       success: _.bind(this.renderData, this)
     })
   },
@@ -203,9 +216,12 @@ var MapPage = Backbone.View.extend({
   highlightBlocks: function(blockIdsResponse) {
     this.recolorBlocks(this.lastHighlightedBlocks_);
 
-    var blocks = _.map(blockIdsResponse['ids'], _.bind(function(id) {
-      return this.idToLayerMap_[id];
-    }, this));
+    var blocks = _.chain(blockIdsResponse['ids'])
+      .map(_.bind(function(id) {
+          return this.idToLayerMap_[id];
+        }, this))
+      .compact()
+      .value();
 
     this.lastHighlightedBlocks_ = blocks;
     

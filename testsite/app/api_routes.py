@@ -15,8 +15,13 @@ from collections import defaultdict
 from . import app, db
 import os
 from itertools import groupby
+from shapely.ops import cascaded_union
+from shapely.geometry import mapping, asShape
+from shapely import speedups
 
-TMP_DIR = '/tmp'
+if speedups.available:
+  print 'shapely speedups available!!!!'
+  speedups.enable()
 
 # start using sqlalchemy cursor
 conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
@@ -79,13 +84,8 @@ def blocksByArea():
   rows = cur.fetchall()
   return jsonify({'ids': [r[0] for r in rows]})
 
-
-@app.route('/api/citydata', methods=['GET'])
-@support_jsonp
-def citydata():
+def getVotes(areaid, user): 
   cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-
-  areaid = request.args.get('areaid', False)
 
   statefp10 = areaid[0:2]
   countyfp10 = areaid[2:]
@@ -104,23 +104,71 @@ def citydata():
       'source': r['source']
     })
  
-  apikey = request.args.get('key', '')
   user_votes = {}
-  if apikey:
-    user = findUserByApiKey(apikey)
+  print 'user? %s' % user
+  print user
+  if user:
     userId = user['id']
-    cur.execute("""select woe_id, blockid, name FROM user_votes v JOIN geoplanet_places ON label::int = woe_id WHERE v.userid = %s AND v.blockid LIKE '%s%%'""" % (userId, areaid))
+    print cur.mogrify("""select woe_id, blockid, name FROM user_votes v JOIN geoplanet_places g ON v.woe_id = g.woe_id WHERE v.userid = %s AND v.blockid LIKE '%s%%'""" % (userId, areaid))
+    cur.execute("""select g.woe_id, blockid, name FROM user_votes v JOIN geoplanet_places g ON v.woe_id = g.woe_id WHERE v.userid = %s AND v.blockid LIKE '%s%%'""" % (userId, areaid))
     for r in cur.fetchall():
-      votes[r['id']].append({
+      votes[r['blockid']].append({
         'label': r['name'], 
         'id': r['woe_id'], 
-        'source': self,
+        'source': 'self',
         'count': 1
       })
+
+  return (rows, votes)
+
+@app.route('/api/citydata', methods=['GET'])
+@support_jsonp
+def citydata():
+  areaid = request.args.get('areaid', False)
+  apikey = request.args.get('key', '')
+
+  user = findUserByApiKey(apikey)
+  (rows, votes) = getVotes(areaid, user)
 
   response = {
     "type": "FeatureCollection",
     "features": makeFeatures(rows, votes)
+  }
+
+  return jsonify(response)
+
+@app.route('/api/neighborhoodsByArea', methods=['GET'])
+@support_jsonp
+def neighborhoodsByArea():
+  areaid = request.args.get('areaid', False)
+  apikey = request.args.get('key', '')
+  user = findUserByApiKey(apikey)
+  (blocks, allVotes) = getVotes(areaid, user)
+
+  blocks_by_hoodid = defaultdict(list)
+  id_to_label = {}
+
+  for block in blocks:
+    geom = asShape(eval(block['geojson_geom']))
+    votes = allVotes[block['geoid10']]
+    if len(votes):
+      maxVote = max(votes, key=lambda x:x['count'])
+      blocks_by_hoodid[maxVote['id']].append(geom)
+      id_to_label[maxVote['id']] = maxVote['label']
+
+  neighborhoods = []
+  for (id, geoms) in blocks_by_hoodid.iteritems():
+    merged = cascaded_union(geoms)
+    geojson = mapping(merged)
+    geojson['properties'] = {
+      'id': id,
+      'label': id_to_label[id]
+    }
+    neighborhoods.append(geojson)
+  
+  response = {
+    "type": "FeatureCollection",
+    "features": neighborhoods
   }
 
   return jsonify(response)
@@ -141,7 +189,6 @@ def labels():
 
   response = []
   for r in rows:
-    print r
     p = re.compile("\\((\d+),(.*)\\)")
     m = p.match(r[0])
     if m:
@@ -149,7 +196,6 @@ def labels():
       label = m.group(2).replace('"', '')
       response.append({'id': id, 'label': label})
       
-  print rows
   return jsonify({'labels': response})
 
 # this should probably go through the user model? meh
@@ -167,84 +213,83 @@ def modifyUsersVoteCount(cur, blockid, woeid, incr):
 @app.route('/api/vote', methods=['POST', 'GET'])
 @support_jsonp
 def do_vote():
-  cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
- 
-  votepairs = []
-  
-  blockid = request.args.get('blockid', '')
-  label = request.args.get('label', '')
-  if blockid and label:
-    blockids = blockid.split(',')
-    for id in blockids:
-      votepairs.append((id, label))
-  else:
-    votes = request.args.get('votes', '')
-
-    # votes are in the form blockid,woeid;blockid,woeid;...
-    for votepair in votes.split(';'):
-      print votepair
-      print votepair.split(',')
-      blockid = votepair.split(',')[0]
-      woeid = int(votepair.split(',')[1])
-      votepairs.append((blockid, woeid))
-  print votepairs
-
-  apikey = request.args.get('key', '')
-  user = findUserByApiKey(apikey)
-  userId = user['id']
-
-  comm = cur.mogrify("""select * FROM user_votes WHERE userid=%s AND blockid IN %s""", (
-    userId,
-    tuple([v[0] for v in votepairs])
-  ))
-  print comm
-  cur.execute(comm)
-
-  rows = cur.fetchall()
-  print rows
-  existing_votes = defaultdict(list)
-  for v in rows:
-    existing_votes[v['blockid']].append(v)
-  print existing_votes
-
-  for (blockid, woeid) in votepairs:
-    print 'looking at label vote %s for block %s' % (woeid, blockid)
-    print existing_votes[blockid]
-
-    already_had_vote = False
-    for existing_vote in existing_votes[blockid]:
-      print 'existing vote %s' % existing_vote
-      if existing_vote['woe_id'] == woeid:
-        already_had_vote = True
-        print 'matched'
-      else:
-        print 'didnot match'
-        modifyUsersVoteCount(cur, blockid, existing_vote['woe_id'], -1)
-        print cur.mogrify("""DELETE FROM user_votes WHERE userid=%s AND blockid=%s AND woe_id=%s""", (
-          userId, blockid, existing_vote['woe_id']))
-
-        cur.execute("""DELETE FROM user_votes WHERE userid=%s AND blockid=%s AND woe_id=%s""", (
-          userId, blockid, existing_vote['woe_id']))
-
-    if not already_had_vote:
-      cur.execute("""select COUNT(*) as c FROM votes WHERE source='users' AND id=%s AND label=%s""", (
-        blockid, int(woeid)
-      ))
-      if cur.fetchone()['c'] > 0:
-        # we have an existing row to increment
-        modifyUsersVoteCount(cur, blockid, int(woeid), 1)
-      else:
-        print 'trying to insert'
-        cur.execute("""INSERT INTO votes (id, label, count, source) values (%s, %s, 1, 'users')""", (
-          blockid, int(woeid)))
+  with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+    votepairs = []
     
-      cur.execute("""INSERT INTO user_votes (userid, blockid, woe_id) values (%s, %s, %s)""", (
-        userId, blockid, int(woeid)))
-      conn.commit()
-        
-    # see if I have an existing vote on user_votes for this block
-    # if I do, and it's for the same woe_id, don't do anything
-    # if it's for a different block
-    # --ugh, see if there's an existing user votes row for new block, if there is, increment it, if not, create it
-    # existing user votes row should exist, so just decrement it
-  return jsonify({})
+    blockid = request.args.get('blockid', '')
+    label = request.args.get('label', '')
+    if blockid and label:
+      blockids = blockid.split(',')
+      for id in blockids:
+        votepairs.append((id, label))
+    else:
+      votes = request.args.get('votes', '')
+
+      # votes are in the form blockid,woeid;blockid,woeid;...
+      for votepair in votes.split(';'):
+        print votepair
+        print votepair.split(',')
+        blockid = votepair.split(',')[0]
+        woeid = int(votepair.split(',')[1])
+        votepairs.append((blockid, woeid))
+    print votepairs
+
+    apikey = request.args.get('key', '')
+    user = findUserByApiKey(apikey)
+    userId = user['id']
+
+    comm = cur.mogrify("""select * FROM user_votes WHERE userid=%s AND blockid IN %s""", (
+      userId,
+      tuple([v[0] for v in votepairs])
+    ))
+    print comm
+    cur.execute(comm)
+
+    rows = cur.fetchall()
+    print rows
+    existing_votes = defaultdict(list)
+    for v in rows:
+      existing_votes[v['blockid']].append(v)
+    print existing_votes
+
+    for (blockid, woeid) in votepairs:
+      print 'looking at label vote %s for block %s' % (woeid, blockid)
+      print existing_votes[blockid]
+
+      already_had_vote = False
+      for existing_vote in existing_votes[blockid]:
+        print 'existing vote %s' % existing_vote
+        if existing_vote['woe_id'] == woeid:
+          already_had_vote = True
+          print 'matched'
+        else:
+          print 'didnot match'
+          modifyUsersVoteCount(cur, blockid, existing_vote['woe_id'], -1)
+          print cur.mogrify("""DELETE FROM user_votes WHERE userid=%s AND blockid=%s AND woe_id=%s""", (
+            userId, blockid, existing_vote['woe_id']))
+
+          cur.execute("""DELETE FROM user_votes WHERE userid=%s AND blockid=%s AND woe_id=%s""", (
+            userId, blockid, existing_vote['woe_id']))
+
+      if not already_had_vote:
+        cur.execute("""select COUNT(*) as c FROM votes WHERE source='users' AND id=%s AND label=%s""", (
+          blockid, int(woeid)
+        ))
+        if cur.fetchone()['c'] > 0:
+          # we have an existing row to increment
+          modifyUsersVoteCount(cur, blockid, int(woeid), 1)
+        else:
+          print 'trying to insert'
+          cur.execute("""INSERT INTO votes (id, label, count, source) values (%s, %s, 1, 'users')""", (
+            blockid, int(woeid)))
+      
+        cur.execute("""INSERT INTO user_votes (userid, blockid, woe_id, ts) values (%s, %s, %s, 'now')""", (
+          userId, blockid, int(woeid)))
+        conn.commit()
+          
+      # see if I have an existing vote on user_votes for this block
+      # if I do, and it's for the same woe_id, don't do anything
+      # if it's for a different block
+      # --ugh, see if there's an existing user votes row for new block, if there is, increment it, if not, create it
+      # existing user votes row should exist, so just decrement it
+    return jsonify({})
