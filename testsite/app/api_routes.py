@@ -121,7 +121,7 @@ def getVotes(areaid, user):
 
   return (rows, votes)
 
-@app.route('/api/citydata', methods=['GET'])
+@app.route('/api/blocksByArea', methods=['GET'])
 @support_jsonp
 def citydata():
   areaid = request.args.get('areaid', False)
@@ -159,10 +159,13 @@ def neighborhoodsByArea():
   neighborhoods = []
   for (id, geoms) in blocks_by_hoodid.iteritems():
     merged = cascaded_union(geoms)
-    geojson = mapping(merged)
-    geojson['properties'] = {
-      'id': id,
-      'label': id_to_label[id]
+    geojson = { 
+      'type': 'Feature',
+      'properties': {
+        'id': id,
+        'label': id_to_label[id]
+      },
+      'geometry': mapping(merged)
     }
     neighborhoods.append(geojson)
   
