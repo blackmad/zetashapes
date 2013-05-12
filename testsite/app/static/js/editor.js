@@ -36,7 +36,7 @@ var MapPage = Backbone.View.extend({
         {
           count: 1,
           source: 'self',
-          label: selectedHoodId
+          id: selectedHoodId
         })
       }, this)
     );
@@ -127,6 +127,14 @@ var MapPage = Backbone.View.extend({
   calculateBestVote: function(feature) {
     return _.max(feature.properties['votes'], function(v) { return v.count })
   },
+  calculateBestId: function(feature) {
+   var bestVote = this.calculateBestVote(feature);
+    if (!bestVote) {
+      return null
+    }
+    return bestVote.id;
+  },
+
 
   calculateBestLabel: function(feature) {
     return feature['properties']['label'];
@@ -280,20 +288,57 @@ var MapPage = Backbone.View.extend({
   clearSelection: function() {
     
   },
+  
+  exitBlockMode: function() {
+    this.inBlockMode_ = false;
+    this.map_.removeLayer(this.blockLayer_);
+    this.map_.addLayer(this.neighborhoodLayer_);
+  },
 
   enterBlockMode: function() {
     // set some boolean
     this.inBlockMode_ = true;
+    this.clickedBlocks_ = [];
     // swap in the block layer
     this.map_.removeLayer(this.neighborhoodLayer_);
     this.map_.addLayer(this.blockLayer_);
-    // make sure the block layer colors itself correctly
+    this.map_.fitBounds(this.lastHighlightedNeighborhood_.getBounds());
+    console.log(this.lastHighlightedNeighborhood_.feature['properties']);
+    var hoodId = this.lastHighlightedNeighborhood_.feature['properties']['id']
+    _.each(this.idToLayerMap_, _.bind(function(layer, id, list) {
+      var id = this.calculateBestId(layer.feature)
+      this.colorBlock(layer);
+    }, this));
   },
+  
+  processBlockClick: function(e) { 
+    console.log(e);
+    var hoodId = this.lastHighlightedNeighborhood_.feature['properties']['id']
+    var id = this.calculateBestId(e.layer.feature)
+    this.clickedBlocks_.push(e.layer.feature.properties.id);
+    if (id == hoodId) {
+      e.layer.feature.properties['votes'] = []
+    } else {
+      e.layer.feature.properties['votes'] = [
+        {
+          count: 1,
+          source: 'self',
+          id: hoodId 
+        }
+      ];
+    }
+    
+    this.colorBlock(e.layer, false);
 
+    // if it's in the hood, delete that entry
+    // if it's not in the hood, add a self entry?
+    // recolor it
+  },
+ 
   processNeighborhoodClick: function(e) { 
     console.log('click')
     console.log(e);
-    this.enterBlockMode()
+    this.enterBlockMode();
  
     L.DomEvent.stopPropagation(e);
   },
@@ -301,6 +346,28 @@ var MapPage = Backbone.View.extend({
   togglePolygonMode: function() {
     this.inPolygonMode_ = !this.inPolygonMode_;
   },
+
+  colorBlockHelper: function(layer, inverted) {
+    var hoodId = this.lastHighlightedNeighborhood_.feature['properties']['id'];
+    var id = this.calculateBestId(layer.feature);
+    if ((id == hoodId && inverted) || 
+        (id != hoodId && !inverted)) {
+      layer.setStyle({
+        weight: 1,
+        color: 'gray',
+        opacity: 1.0
+      });
+    } else {
+      layer.setStyle({
+        weight: 1,
+        color: 'red',
+        opacity: 1.0
+      });
+    }
+  },
+  
+  colorBlock: function(layer) { this.colorBlockHelper(layer, false); },
+  highlightBlock: function(layer) { this.colorBlockHelper(layer, true); },
 
   cacheBlockData: function(geojson) {
     function onEachFeature(feature, layer) {
@@ -315,6 +382,17 @@ var MapPage = Backbone.View.extend({
 			onEachFeature: _.bind(onEachFeature, this)
 		});     
     console.log('loaded block layer');
+    var mouseOverCb = function(e) {
+      this.highlightBlock(e.layer);
+    }
+    this.blockLayer_.on('mouseover', _.bind(mouseOverCb, this));
+
+    var mouseOutCb = function(e) {
+      this.colorBlock(e.layer);
+    }
+
+    this.blockLayer_.on('mouseout', _.bind(mouseOutCb, this))
+    this.blockLayer_.on('click', _.bind(this.processBlockClick, this))
   },
 
   renderData: function(geojson) {
@@ -330,7 +408,7 @@ var MapPage = Backbone.View.extend({
 			key: 'BC9A493B41014CAABB98F0471D759707'
 		}).addTo(map);
 
-    this.lastHighlightedNeighborhod_ = null;
+    this.lastHighlightedNeighborhood_ = null;
     this.lastHighlightedBlocks_ = [];
 
     var centered = false;
