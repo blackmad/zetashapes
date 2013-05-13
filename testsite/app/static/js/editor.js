@@ -1,7 +1,3 @@
-// change into block-select mode
-  // click on hood block, de-select
-  // click on non-hood block, select
-  // clicking again inverts
 // when done, submit positive and negative votes
 // be able to register negative votes
 // wait for block data
@@ -183,6 +179,21 @@ var MapPage = Backbone.View.extend({
     this.apiKey_ = this.options.api_key;
     console.log(this.options);
 
+    this.map_= L.map('map', {dragging: true}).setView([40.74, -74], 13);
+   	L.tileLayer('http://{s}.tile.cloudmade.com/{key}/22677/256/{z}/{x}/{y}.png', {
+			attribution: 'Map data &copy; 2011 OpenStreetMap contributors, Imagery &copy; 2012 CloudMade',
+			key: 'BC9A493B41014CAABB98F0471D759707'
+		}).addTo(this.map_);
+
+    this.neighborhoodLayer_ = L.geoJson(null, {
+			style: function (feature) {
+				return feature.properties && feature.properties.style;
+			},
+
+			onEachFeature: _.bind(this.onEachNeighborhoodFeature, this)
+		}).addTo(this.map_);
+    this.neighborhoodLayer_.fire('data:loading');
+
     $.ajax({
       dataType: 'json',
       url: '/api/labels?callback=?',
@@ -208,6 +219,10 @@ var MapPage = Backbone.View.extend({
       },
       success: _.bind(this.renderData, this)
     })
+
+   this.blockLayer_ = null;
+   var object = {}
+   this.blockLoader_ = _.extend(object, Backbone.Events);
 
     $.ajax({
       dataType: 'json',
@@ -290,18 +305,48 @@ var MapPage = Backbone.View.extend({
   },
   
   exitBlockMode: function() {
+    $('.exitBlockMode').hide();
     this.inBlockMode_ = false;
     this.map_.removeLayer(this.blockLayer_);
     this.map_.addLayer(this.neighborhoodLayer_);
+
+    // go through clicked blocks
+    this.colorFeature(this.lastHighlightedNeighborhood_.feature, this.lastHighlightedNeighborhood_);
+    var hoodId = this.lastHighlightedNeighborhood_.feature['properties']['id']
+    var voteString = _.map(this.clickedBlocks_, function(feature) {
+      if (feature.properties['votes'].length == 0) {
+        return feature.properties['id'] + ',' + hoodId + ',-1';
+      } else {
+        return feature.properties['id'] + ',' + hoodId + ',1';
+      }
+    }).join(';')
+   
+    if (voteString) {
+      $.ajax({
+        dataType: 'json',
+        url: '/api/vote',
+        data: { 
+          key: this.apiKey_,
+          votes: voteString
+        },
+        success: _.bind(this.updateHoods, this)
+      });
+    }
   },
 
-  enterBlockMode: function() {
+  updateHoods: function(geojson) {
+    // what we should do here is merge this with our existing geojson, sigh.
+    this.neighborhoodLayer_.clearLayers();
+    this.neighborhoodLayer_.addData(geojson);
+  },
+
+  reallyEnterBlockMode: function() {
+    $('.exitBlockMode').show();
     // set some boolean
     this.inBlockMode_ = true;
     this.clickedBlocks_ = [];
     // swap in the block layer
     this.map_.removeLayer(this.neighborhoodLayer_);
-    this.map_.addLayer(this.blockLayer_);
     this.map_.fitBounds(this.lastHighlightedNeighborhood_.getBounds());
     console.log(this.lastHighlightedNeighborhood_.feature['properties']);
     var hoodId = this.lastHighlightedNeighborhood_.feature['properties']['id']
@@ -310,12 +355,27 @@ var MapPage = Backbone.View.extend({
       this.colorBlock(layer);
     }, this));
   },
+
+  enterBlockMode: function() {
+    if (this.blockLayer_) {
+      this.map_.addLayer(this.blockLayer_);
+      this.reallyEnterBlockMode();
+    } else {
+      this.blockLayer_ = L.geoJson(null).addTo(this.map_);
+      this.blockLayer_.fire('data:loading');
+
+      this.blockLoader_.once('loaded', _.bind(this, function() {
+        this.blockLayer_.fire('data:loaded');
+        this.reallyEnterBlockMode();
+      }));
+    }
+  },
   
   processBlockClick: function(e) { 
     console.log(e);
     var hoodId = this.lastHighlightedNeighborhood_.feature['properties']['id']
     var id = this.calculateBestId(e.layer.feature)
-    this.clickedBlocks_.push(e.layer.feature.properties.id);
+    this.clickedBlocks_.push(e.layer.feature);
     if (id == hoodId) {
       e.layer.feature.properties['votes'] = []
     } else {
@@ -338,7 +398,12 @@ var MapPage = Backbone.View.extend({
   processNeighborhoodClick: function(e) { 
     console.log('click')
     console.log(e);
-    this.enterBlockMode();
+    if (this.apiKey_) {
+      this.enterBlockMode();
+    } else {
+      var modalEl = $('#loginModal')
+      modalEl.modal();
+    }
  
     L.DomEvent.stopPropagation(e);
   },
@@ -382,6 +447,7 @@ var MapPage = Backbone.View.extend({
 			onEachFeature: _.bind(onEachFeature, this)
 		});     
     console.log('loaded block layer');
+    this.blockLoader_.trigger('loaded');
     var mouseOverCb = function(e) {
       this.highlightBlock(e.layer);
     }
@@ -395,57 +461,35 @@ var MapPage = Backbone.View.extend({
     this.blockLayer_.on('click', _.bind(this.processBlockClick, this))
   },
 
+  onEachNeighborhoodFeature: function(feature, layer) {
+      if (!this.centered) {
+        window.console.log(feature);
+        if (feature.geometry.type == "Polygon") {
+          this.map_.panTo(new L.LatLng(feature.geometry.coordinates[0][0][1], feature.geometry.coordinates[0][0][0]));
+        } else {
+          this.map_.panTo(new L.LatLng(feature.geometry.coordinates[0][0][0][1], feature.geometry.coordinates[0][0][0][0]));
+        }
+        this.centered = true;
+      } 
+      this.colorFeature(feature, layer); 
+  },
+
   renderData: function(geojson) {
     console.log(geojson);
-    var map = L.map('map', {dragging: true}).setView([40.74, -74], 13);
     this.$polygonMode = $('#polygonMode')
     this.$polygonMode.button();
     this.$polygonMode.click(_.bind(this.togglePolygonMode, this))
-
-    this.map_ = map;
-   	L.tileLayer('http://{s}.tile.cloudmade.com/{key}/22677/256/{z}/{x}/{y}.png', {
-			attribution: 'Map data &copy; 2011 OpenStreetMap contributors, Imagery &copy; 2012 CloudMade',
-			key: 'BC9A493B41014CAABB98F0471D759707'
-		}).addTo(map);
+    $('.exitBlockModeButton').click(_.bind(this.exitBlockMode, this)); 
 
     this.lastHighlightedNeighborhood_ = null;
     this.lastHighlightedBlocks_ = [];
 
-    var centered = false;
-    function onEachFeature(feature, layer) {
-      if (!centered) {
-        window.console.log(feature);
-        if (feature.geometry.type == "Polygon") {
-          map.panTo(new L.LatLng(feature.geometry.coordinates[0][0][1], feature.geometry.coordinates[0][0][0]));
-        } else {
-          map.panTo(new L.LatLng(feature.geometry.coordinates[0][0][0][1], feature.geometry.coordinates[0][0][0][0]));
-        }
-        centered = true;
-      } 
-      this.colorFeature(feature, layer); 
-//			layer.bindPopup(popupContent);
-
-      /*layer.on('mousedown', function(e) {
-        console.log(e)
-      }); */
-		}
-
-		var geojsonLayer = L.geoJson([geojson], {
-			style: function (feature) {
-				return feature.properties && feature.properties.style;
-			},
-
-			onEachFeature: _.bind(onEachFeature, this)
-		});
-    this.neighborhoodLayer_ = geojsonLayer;
+    this.neighborhoodLayer_.addData(geojson)
+    this.neighborhoodLayer_.fire('data:loaded');
     
-    geojsonLayer.addTo(map);
- 
-    // map.on('click', _.bind(this.processClick, this))
-    // map.on('dblclick', _.bind(this.processDoubleClick, this))
-    geojsonLayer.on('click', _.bind(this.processNeighborhoodClick, this))
+    this.neighborhoodLayer_.on('click', _.bind(this.processNeighborhoodClick, this))
 
-    map.on('mousemove', _.bind(function(e) {
+    this.map_.on('mousemove', _.bind(function(e) {
         // console.log(e)
         if (this.inPolygonMode()) {
           if (this.currentPaintLine_) {
@@ -455,7 +499,7 @@ var MapPage = Backbone.View.extend({
         } 
       }, this));
 
-    geojsonLayer.on('mouseover', _.bind(function(e) {
+    this.neighborhoodLayer_.on('mouseover', _.bind(function(e) {
       e.layer.setStyle({
         weight: 1,
         color: 'red',
@@ -477,6 +521,6 @@ var MapPage = Backbone.View.extend({
       this.colorFeature(e.layer.feature, e.layer);
     }
 
-    geojsonLayer.on('mouseout', _.bind(mouseOutCb, this))
+    this.neighborhoodLayer_.on('mouseout', _.bind(mouseOutCb, this))
   }
 });

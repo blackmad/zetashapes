@@ -12,12 +12,16 @@
           <div class="well">
       <br/>
         {%- if current_user.is_authenticated() -%}
-          'Polygon mode': <button type="button" id="polygonMode" class="btn btn-primary" data-loading-text="Off" data-toggle="button">On</button>
+          Click on a neighborhood to enter editing mode.
+          <!--'Polygon mode': <button type="button" id="polygonMode" class="btn btn-primary" data-loading-text="Off" data-toggle="button">On</button>-->
         {%- else -%}
            If you want to edit the map, please <a href="/login">login</a>
         {%- endif -%}
 
       <br/><br/>
+      <div class="exitBlockMode" style="display:none">
+        <button type="button" class="exitBlockModeButton" class="btn btn-primary">Finish Editing</button>
+      </div>
       <span id="neighborhoodInfo"></span>
           </div>
         </div>
@@ -38,6 +42,18 @@
   <div class="modal-footer">
     <a href="#" class="btn closeButton">Cancel</a>
     <a href="#" class="btn btn-primary saveButton">Save changes</a>
+  </div>
+</div>
+
+<div class="modal hide fade" id="loginModal">
+  <div class="modal-header">
+    <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+    <h3>Please Login to Edit</h3>
+  </div>
+  <div class="modal-body">
+    <div class="ui-widget">
+      If you'd like to contribute to the zetashapes project, please <a href="/login">login</a> or <a href="/register">register</a>.
+    </div>
   </div>
 </div>
 

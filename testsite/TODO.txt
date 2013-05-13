@@ -1,31 +1,10 @@
---submit votes
---show your own votes
---homepage
---fix combobox dropdown
---state -> county index pages?
---lock editing without login
+--a click and drag mode?
+--something is inconsistent with voting, but it's close
+
+--make an indexish page -- states to counties?
+
+--send down metros instead of counties?
+--allow people to fetch their modifications
+
+--smear flickr data
 --load the rest of the US
---patch endpoint
---display multiple counties
-
---undo?
---show other info
-
-
---make blocks into a model
---enable voting
---build paint mode
---ability to add/delete hoods
---build undo
-
-server side:
---more filter out water
---add "smoothing" votes
-
-
-gis=# alter table votes add foreign key (label) references geoplanet_places(woe_id);
-ERROR:  insert or update on table "votes" violates foreign key constraint "votes_label_fkey"
-DETAIL:  Key (label)=(23417225) is not present in table "geoplanet_places".
-*/
-
-
