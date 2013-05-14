@@ -1,3 +1,4 @@
+--fix voting?
 --do something with unassigned blocks?
 --add first-time help?
 --remove password/local-account logins

@@ -19,7 +19,7 @@ from shapely import speedups
 def pickBestVote(votes, preferSmear=True):
   maxVote = None
   selfVotes = [v for v in votes if v['source'] == 'self']
-  
+  positiveSelfVotes = None
   if len(selfVotes) > 0:
     negativeSelfVotes = [v for v in selfVotes if v['count'] < 0]
     positiveSelfVotes = [v for v in selfVotes if v['count'] > 1]
@@ -31,7 +31,7 @@ def pickBestVote(votes, preferSmear=True):
     maxVote = max(votes, key=lambda x:x['count'])
 
   smearVotes = [v for v in votes if v['source'] == 'smear']
-  if preferSmear and smearVotes:
+  if preferSmear and smearVotes and not positiveSelfVotes:
     return smearVotes[0]
 
   return maxVote
