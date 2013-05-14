@@ -181,7 +181,7 @@ def modifyUsersVoteCount(cur, userLevel, blockid, woeid, incr):
     incr, woeid, blockid
   ))
 
-IncomingBlockVote = namedtuple('IncomingBlockVote', ['blockid', 'woe_id', 'weight'], verbose=True)
+IncomingBlockVote = namedtuple('IncomingBlockVote', ['blockid', 'woe_id', 'weight'])
 
 # get is only for testing
 @app.route('/api/vote', methods=['POST', 'GET'])

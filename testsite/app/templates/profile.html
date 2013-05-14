@@ -24,7 +24,15 @@
 
 {% block layout %}
 <div class="page-header">
-  <h1>Hello, {{ current_user.email }}!</h1>
+  <h1>Hello,
+    {% if twitter_conn %}
+      {{ twitter_conn.display_name }}!
+    {% elif facebook_conn %}
+      {{ facebook_conn.display_name }}!
+    {% else %}
+      I'm sorry, I forget your name.
+    {% endif %}
+  </h1>
 </div>
 <div class="row">
   {{ show_provider_button('twitter', 'Twitter', twitter_conn) }}

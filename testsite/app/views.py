@@ -6,7 +6,6 @@ from flask.ext.social.utils import get_provider_or_404
 from flask.ext.social.views import connect_handler
 
 from . import app, db
-from .forms import RegisterForm
 from .models import User
 from .tools import requires_auth
 
@@ -33,10 +32,11 @@ def editor(areaid=None):
 @app.route('/register', methods=['GET', 'POST'])
 @app.route('/register/<provider_id>', methods=['GET', 'POST'])
 def register(provider_id=None):
+    print 'REGISTER'
     if current_user.is_authenticated():
         return redirect(request.referrer or '/')
 
-    form = RegisterForm()
+    print 'HELLLLLLOOOOO'
 
     if provider_id:
         print provider_id
@@ -45,12 +45,17 @@ def register(provider_id=None):
     else:
         provider = None
         connection_values = None
-
-    if form.validate_on_submit():
-        ds = current_app.security.datastore
-        user = ds.create_user(email=form.email.data, password=form.password.data)
-
+  
+    print 'true?'
+    print provider
+    print connection_values
+    if provider and connection_values:
         char_set = string.ascii_uppercase + string.digits
+        ds = current_app.security.datastore
+        user = ds.create_user(
+          email=''.join(random.sample(char_set*32,32)) + '@test.com',
+          password=''.join(random.sample(char_set*32,32))
+        )
         user.api_key = ''.join(random.sample(char_set*32,32))
 
         ds.commit()
@@ -73,7 +78,6 @@ def register(provider_id=None):
     login_failed = int(request.args.get('login_failed', 0))
 
     return render_template('register.html',
-                           form=form,
                            provider=provider,
                            login_failed=login_failed,
                            connection_values=connection_values)

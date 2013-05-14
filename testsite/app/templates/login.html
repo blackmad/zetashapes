@@ -15,18 +15,6 @@
   <h1>Log In</h1>
 </div>
 <div class="row content">
-  <div class="span4 offset1">
-    <form class="well" action="{{ url_for('security.login') }}" method="POST">
-      {{ form.hidden_tag() }}
-      {{ render_field(form.email) }}
-      {{ render_field(form.password) }}
-      <label class="checkbox">{{ form.remember()|safe }} Remember me</label>
-      <button type="submit" class="btn btn-primary btn-large">Login</button>
-    </form>
-  </div>
-  <div class="span2 col2">
-    <h3>OR</h3>
-  </div>
   <div class="span4 col3">
     {{ social_login('twitter', 'Twitter' )}}
     {{ social_login('facebook', 'Facebook' )}}
