@@ -20,16 +20,11 @@
   <div class="row">
     <div class="span4">
       <div class="well repo-info">
-        <h2>Flask-Security</h2>
-        <ul class="repo-actions">
-          <li>
-            <iframe src="http://ghbtns.com/github-btn.html?user=mattupstate&repo=flask-security&type=watch&count=true&size=large"
-                    allowtransparency="true" frameborder="0" scrolling="0" width="130px" height="30px"></iframe>
-          </li>
-          <!-- <li>
-            <iframe src="http://ghbtns.com/github-btn.html?user=mattupstate&repo=flask-security&type=fork&count=true&size=large"
-                    allowtransparency="true" frameborder="0" scrolling="0" width="120px" height="30px"></iframe></p>
-          </li> -->
+        <h2>Nearby Counties</h2>
+        <ul>
+          {% for area in areas -%}
+            <li><a href="/editor/{{area.areaid}}">{{ area.displayName}}</a></li>
+          {%- endfor %}
         </ul>
       </div>
     </div>

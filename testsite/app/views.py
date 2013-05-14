@@ -5,6 +5,9 @@ from flask.ext.security import LoginForm, current_user, login_required, \
 from flask.ext.social.utils import get_provider_or_404
 from flask.ext.social.views import connect_handler
 
+import geo_utils
+import vote_utils
+
 from . import app, db
 from .models import User
 from .tools import requires_auth
@@ -12,9 +15,22 @@ from .tools import requires_auth
 import random
 import string
 
+import pygeoip
+gi = pygeoip.GeoIP('app/data/GeoLiteCity.dat', pygeoip.MEMORY_CACHE)
+
+import psycopg2
+conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
+
 @app.route('/')
 def index():
-    return render_template('index.html', total_users=User.query.count())
+    geoip = gi.record_by_addr(request.remote_addr)
+    print geoip
+    areas = []
+    if geoip['country_code'] == 'US':
+      areas = geo_utils.getNearestCounties(conn, geoip['latitude'], geoip['longitude'])
+      print areas
+    
+    return render_template('index.html', total_users=User.query.count(), areas=areas)
 
 
 @app.route('/login')
@@ -86,10 +102,14 @@ def register(provider_id=None):
 @app.route('/profile')
 @login_required
 def profile():
+    areaids = vote_utils.getAreaIdsForUserId(conn, current_user.id)
+    areas = geo_utils.getInfoForAreaIds(conn, areaids)
     return render_template('profile.html',
+        areas=areas,
         twitter_conn=current_app.social.twitter.get_connection(),
         facebook_conn=current_app.social.facebook.get_connection(),
-        github_conn=current_app.social.github.get_connection())
+        github_conn=current_app.social.github.get_connection()
+    )
 
 
 @app.route('/admin')

@@ -1,7 +1,5 @@
---fix voting?
 --do something with unassigned blocks?
 --add first-time help?
---remove password/local-account logins
 --make an indexish page -- states to counties? autocomplete? geoip?
 --delete neighborhood
 --add neighborhood

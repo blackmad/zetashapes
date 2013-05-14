@@ -36,6 +36,11 @@ def pickBestVote(votes, preferSmear=True):
 
   return maxVote
 
+def getAreaIdsForUserId(conn, userId):
+  cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+  cur.execute("""select blockid FROM user_votes v JOIN geoplanet_places g ON v.woe_id = g.woe_id WHERE v.userid = %s""" % (userId))
+  areaids = tuple(set([x['blockid'][0:5] for x in cur.fetchall()]))
+  return areaids
 
 def getVotes(conn, areaid, user): 
   cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)

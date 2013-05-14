@@ -19,6 +19,7 @@ from itertools import groupby
 from shapely.ops import cascaded_union
 from shapely.geometry import mapping, asShape
 from shapely import speedups
+import geo_utils
 import vote_utils
 
 if speedups.available:
@@ -38,6 +39,7 @@ def support_jsonp(f):
             return current_app.response_class(content, mimetype='application/javascript')
         else:
             return f(*args, **kwargs)
+
     return decorated_function
 
 
@@ -134,7 +136,13 @@ def getNeighborhoodsByArea(areaid, user):
     "features": neighborhoods
   }
 
-  return jsonify(response)
+  jresponse = jsonify(response)
+  
+  intent = request.args.get('intent', None)
+  if intent == 'download':
+    jresponse.headers[u"Content-Disposition"] = 'attachment; filename=%s.json' % areaid
+
+  return jresponse
 
 @app.route('/api/neighborhoodsByArea', methods=['GET'])
 @support_jsonp
@@ -144,6 +152,12 @@ def neighborhoodsByArea():
   user = findUserByApiKey(apikey)
   return getNeighborhoodsByArea(areaid, user)
 
+@app.route('/api/areaInfo', methods=['GET'])
+@support_jsonp
+def areaInfo():
+  areaid = request.args.get('areaid', False).split(',')
+  areaInfos = geo_utils.getInfoForAreaIds(conn, areaid)
+  return jsonify({'areas': areaInfos})
 
 @app.route('/api/labels', methods=['GET'])
 @support_jsonp

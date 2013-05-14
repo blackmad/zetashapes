@@ -2,7 +2,7 @@
 
 {% block body_class %}main main-profile{% endblock %}
 
-{% macro show_provider_button(provider_id, display_name, conn, show_update_form=True) %}
+{% macro show_provider_button(provider_id, display_name, conn, show_update_form=True) %} 
   <div class="span6">
     <h2>{{ display_name }}</h2>
     <hr />
@@ -34,6 +34,21 @@
     {% endif %}
   </h1>
 </div>
+
+<div>
+  <h2>Places you've edited</h2>
+  {% if areas|length > 0 %}
+   <ul>
+     {% for area in areas -%}
+       <li><a href="/editor/{{area.areaid}}">{{ area.displayName}}</a> <a href="/api/neighborhoodsByArea?areaid={{area.areaid}}&key={{current_user.api_key}}&intent=download">(download)</a></li>
+     {% endfor %}
+   </ul>
+  {% else %}
+    You haven't edited any areas yet, why not start?
+  {% endif %}
+</div>
+
+
 <div class="row">
   {{ show_provider_button('twitter', 'Twitter', twitter_conn) }}
   {{ show_provider_button('facebook', 'Facebook', facebook_conn) }}

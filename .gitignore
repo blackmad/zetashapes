@@ -3,6 +3,7 @@
 .settings
 .project
 .pydevproject
+app/data/*
 app/static/.webaassets-cache/*
 !app/static/.webassets-cache/.gitignore
 *.pyc
