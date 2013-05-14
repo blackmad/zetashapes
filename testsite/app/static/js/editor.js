@@ -14,15 +14,17 @@ function cloneLatLng(ll) {
 var MapPage = Backbone.View.extend({
   recolorBlocks: function(blocks) {
     _.each(blocks, _.bind(function(block) {
-      this.colorFeature(block.feature, block);
+      this.colorBlock(block, 1.0);
     }, this));
-
   },
 
   unhighlightPolygon: function() {
+    console.log('unhighlighting');
     if (this.currentPaintLine_) {
+      console.log('doing stuff');
       this.map_.removeLayer(this.currentPaintLine_);
-      this.recolorBlocks(this.lastHighlightedBlocks_);
+      this.lastHighlightedBlocks_ = [];
+      this.togglePolygonMode();
       this.currentPaintLine_ = null;
     }
   },
@@ -151,7 +153,6 @@ var MapPage = Backbone.View.extend({
       this.labelColors_[bestLabel] = color;
       colors = _.without(colors, color)
     }
-    console.log(this.labelColors_[bestLabel]);
     return color;
   },
 
@@ -177,6 +178,16 @@ var MapPage = Backbone.View.extend({
     this.idToLayerMap_ = {}
     this.inPolygonMode_ = false;
     this.$selectedNeighborhoodSpan = $('#selectedNeighborhood');
+
+    function onEachFeature(feature, layer) {
+      this.idToLayerMap_[feature.properties.id] = layer;
+    }
+
+    this.blockLayer_ = L.geoJson(null, {
+			onEachFeature: _.bind(onEachFeature, this)
+		});     
+
+    this.blocksLoaded_ = false;
 
     this.labels_ = {};
     this.labelColors_ = {};
@@ -224,7 +235,6 @@ var MapPage = Backbone.View.extend({
       success: _.bind(this.renderData, this)
     })
 
-   this.blockLayer_ = null;
    var object = {}
    this.blockLoader_ = _.extend(object, Backbone.Events);
 
@@ -259,7 +269,7 @@ var MapPage = Backbone.View.extend({
 
   highlightBlocks: function(blockIdsResponse, opacity) {
     console.log('opacity? ' + opacity);
-    opacity = opacity || 1.0;
+    opacity = opacity || 0.2;
     this.recolorBlocks(this.lastHighlightedBlocks_);
 
     var blocks = _.chain(blockIdsResponse['ids'])
@@ -272,12 +282,7 @@ var MapPage = Backbone.View.extend({
     this.lastHighlightedBlocks_ = blocks;
     
     _.each(blocks, _.bind(function(block) {
-      block.setStyle({
-          weight: 1,
-          color: 'orange',
-          opacity: 1.0
-        });
-
+      this.toggleBlockVote(block, true);
     }, this))
   },
 
@@ -293,23 +298,19 @@ var MapPage = Backbone.View.extend({
 
   },
 
-  processDoubleClick: function(e) { 
+  processPolygonDoubleClick: function(e) { 
     console.log('dblclick')
     console.log(e)
     if (this.inPolygonMode()) {
-      console.log('in paint mode')
+      console.log('in paint mode, trying to stop being in it')
       if (this.currentPaintLine_) {
-        this.highlightBlocksByGeometry(this.currentPaintLine_.getLatLngs())
-        this.promptModal();
+        this.highlightBlocksByGeometry(this.currentPaintLine_.getLatLngs());
+        this.unhighlightPolygon();
       }
     } 
     L.DomEvent.stopPropagation(e);
   },
 
-  clearSelection: function() {
-    
-  },
-  
   exitBlockMode: function(vote) {
     $('.exitBlockMode').hide();
     this.inBlockMode_ = false;
@@ -354,7 +355,6 @@ var MapPage = Backbone.View.extend({
     this.inBlockMode_ = true;
     this.clickedBlocks_ = [];
     // swap in the block layer
-    this.map_.removeLayer(this.neighborhoodLayer_);
     this.map_.fitBounds(this.lastHighlightedNeighborhood_.getBounds());
     console.log(this.lastHighlightedNeighborhood_.feature['properties']);
     var hoodId = this.lastHighlightedNeighborhood_.feature['properties']['id']
@@ -365,44 +365,84 @@ var MapPage = Backbone.View.extend({
   },
 
   enterBlockMode: function() {
-    if (this.blockLayer_) {
-      this.map_.addLayer(this.blockLayer_);
+    this.map_.removeLayer(this.neighborhoodLayer_);
+    this.map_.addLayer(this.blockLayer_);
+    if (this.blocksLoaded_) {
       this.reallyEnterBlockMode();
     } else {
-      this.blockLayer_ = L.geoJson(null).addTo(this.map_);
       this.blockLayer_.fire('data:loading');
 
       this.blockLoader_.once('loaded', _.bind(function() {
-        this.blockLayer_.fire('data:loaded');
+        console.log('should hide spinner');
         this.reallyEnterBlockMode();
       }, this));
     }
   },
-  
-  processBlockClick: function(e) { 
-    console.log(e);
+
+  toggleBlockVote: function(layer, force) {
     var hoodId = this.lastHighlightedNeighborhood_.feature['properties']['id']
-    var id = this.calculateBestId(e.layer.feature)
-    this.clickedBlocks_.push(e.layer.feature);
-    if (id == hoodId) {
-      e.layer.feature.properties['votes'] = []
-    } else {
-      e.layer.feature.properties['votes'] = [
+    var id = this.calculateBestId(layer.feature)
+    this.clickedBlocks_.push(layer.feature);
+    if (id =! hoodId || force) {
+      layer.feature.properties['votes'] = [
         {
           count: 1,
           source: 'self',
           id: hoodId 
         }
       ];
+    } else {
+      layer.feature.properties['votes'] = []
     }
-    
-    this.colorBlock(e.layer, false);
+  
+    this.colorBlock(layer, false);
 
     // if it's in the hood, delete that entry
     // if it's not in the hood, add a self entry?
     // recolor it
   },
- 
+  
+  processBlockClick: function(e) { 
+    if (e.originalEvent.shiftKey) {
+      if (!this.inPolygonMode_) {
+        this.currentPaintLine_ = new L.Polygon([cloneLatLng(e.latlng), cloneLatLng(e.latlng)]);
+        this.map_.addLayer(this.currentPaintLine_);
+        this.currentPaintLine_.on('click', _.bind(this.processPolygonClick, this))
+        this.currentPaintLine_.on('dblclick', _.bind(this.processPolygonDoubleClick, this))
+      }
+
+      console.log('toggling polygon mode');
+      this.lastHighlightedBlocks_ = [];
+
+      this.togglePolygonMode();
+    } else {
+      this.toggleBlockVote(e.layer);
+    }
+  }, 
+
+  processPolygonClick: function(e) { 
+    if (e.originalEvent.shiftKey) {
+      this.processPolygonDoubleClick(e);
+    } else if (this.inPolygonMode()) {
+      console.log('in paint mode')
+      console.log(this.currentPaintLine_);
+      if (this.currentPaintLine_) {
+        var lastIndex = this.currentPaintLine_.getLatLngs().length - 1
+        console.log(this.currentPaintLine_.getLatLngs()[0].distanceTo(e.latlng));
+        if (this.currentPaintLine_.getLatLngs()[0].distanceTo(e.latlng) < 100) {
+          this.highlightBlocksByGeometry(this.currentPaintLine_.getLatLngs())
+          this.currentPaintLine_ = null;
+        } else {
+          this.highlightBlocksByGeometry(this.currentPaintLine_.getLatLngs())
+          this.currentPaintLine_.spliceLatLngs(lastIndex, 1, cloneLatLng(e.latlng), cloneLatLng(e.latlng));
+        }
+      } else {
+        this.lastHighlightedBlocks_ = [];
+        this.currentPaintLine_ = new L.Polygon([cloneLatLng(e.latlng), cloneLatLng(e.latlng)]);
+        this.map_.addLayer(this.currentPaintLine_);
+      }
+    }
+  },
   processNeighborhoodClick: function(e) { 
     console.log('click')
     console.log(e);
@@ -442,19 +482,12 @@ var MapPage = Backbone.View.extend({
   colorBlock: function(layer, opacity) { this.colorBlockHelper(layer, false, opacity); },
   highlightBlock: function(layer, opacity) { this.colorBlockHelper(layer, true, opacity); },
 
-  cacheBlockData: function(geojson) {
-    function onEachFeature(feature, layer) {
-      this.idToLayerMap_[feature.properties.id] = layer;
-    }
-
-    this.blockLayer_ = L.geoJson([geojson], {
-			style: function (feature) {
-				return feature.properties && feature.properties.style;
-			},
-
-			onEachFeature: _.bind(onEachFeature, this)
-		});     
+  cacheBlockData: function(geojson) { 
     console.log('loaded block layer');
+    this.blocksLoaded_ = true;
+    this.blockLayer_.fire('data:loaded');
+    this.blockLayer_.addData(geojson)
+
     this.blockLoader_.trigger('loaded');
     var mouseOverCb = function(e) {
       this.highlightBlock(e.layer, 0.75);
@@ -464,36 +497,7 @@ var MapPage = Backbone.View.extend({
       this.colorBlock(e.layer);
     }
 
-   var mouseDownCb = function(e) {
-     console.log(e);
-     if (this.inBlockMode_) {
-       if (e.originalEvent.shiftKey == true) {
-         this.map_.dragging.disable();
-         L.DomEvent.stopPropagation(e);
-       }
-     }
-   };
-   
-   var mouseUpCb = function(e) {
-     this.map_.dragging.disable();
-   }
-    
     this.map_.boxZoom.disable();
-/*
-    $(document).keydown(_.bind(function(event) {
-      // 69 = e 
-      // 65 = a
-      // space
-
-      if (event.keyCode == 32) {
-        this.toggleBlockPaintMode();
-      }
-      console.log(event);
-    }, this)); 
-    */
-   
-    this.map_.on('mousedown', _.bind(mouseDownCb, this))
-    this.map_.on('mouseup', _.bind(mouseUpCb, this))
     this.blockLayer_.on('mouseover', _.bind(mouseOverCb, this));
     this.blockLayer_.on('mouseout', _.bind(mouseOutCb, this))
     this.blockLayer_.on('click', _.bind(this.processBlockClick, this))
