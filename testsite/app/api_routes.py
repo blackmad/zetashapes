@@ -19,6 +19,7 @@ from itertools import groupby
 from shapely.ops import cascaded_union
 from shapely.geometry import mapping, asShape
 from shapely import speedups
+import vote_utils
 
 if speedups.available:
   print 'shapely speedups available!!!!'
@@ -46,7 +47,7 @@ def makeFeature(row, voteDict, user):
     "geometry": eval(row['geojson_geom']),
     "properties": {
       "id": row['geoid10'],
-      "votes": [x for x in [pickBestVote(voteDict[row['geoid10']])] if x]
+      "votes": [x for x in [vote_utils.pickBestVote(voteDict[row['geoid10']])] if x]
     }
   }
 
@@ -85,42 +86,6 @@ def blocksByArea():
   rows = cur.fetchall()
   return jsonify({'ids': [r[0] for r in rows]})
 
-def getVotes(areaid, user): 
-  cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-
-  statefp10 = areaid[0:2]
-  countyfp10 = areaid[2:]
-
-  cur.execute("""select geoid10, ST_AsGeoJSON(ST_Transform(geom, 4326)) as geojson_geom FROM tabblock10 tb WHERE statefp10 = %s AND countyfp10 = %s AND blockce10 NOT LIKE '0%%'""", (statefp10, countyfp10))
-  rows = cur.fetchall()
-
-  cur.execute("""select woe_id, id, label, count, source, name FROM votes v JOIN geoplanet_places ON label::int = woe_id WHERE id LIKE '%s%%'""" % (areaid))
-
-  votes = defaultdict(list)
-  for r in cur.fetchall():
-    votes[r['id']].append({
-      'label': r['name'], 
-      'id': r['woe_id'], 
-      'count': r['count'], 
-      'source': r['source']
-    })
- 
-  user_votes = {}
-  print 'user? %s' % user
-  print user
-  if user:
-    userId = user['id']
-    cur.execute("""select g.woe_id, blockid, name, weight FROM user_votes v JOIN geoplanet_places g ON v.woe_id = g.woe_id WHERE v.userid = %s AND v.blockid LIKE '%s%%'""" % (userId, areaid))
-    for r in cur.fetchall():
-      votes[r['blockid']].append({
-        'label': r['name'], 
-        'id': r['woe_id'], 
-        'source': 'self',
-        'count': r['weight']
-      })
-
-  return (rows, votes)
-
 @app.route('/api/blocksByArea', methods=['GET'])
 @support_jsonp
 def citydata():
@@ -128,7 +93,7 @@ def citydata():
   apikey = request.args.get('key', '')
 
   user = findUserByApiKey(apikey)
-  (rows, votes) = getVotes(areaid, user)
+  (rows, votes) = vote_utils.getVotes(conn, areaid, user)
 
   response = {
     "type": "FeatureCollection",
@@ -137,23 +102,8 @@ def citydata():
 
   return jsonify(response)
 
-def pickBestVote(votes):
-  maxVote = None
-  selfVotes = [v for v in votes if v['source'] == 'self']
-  if len(selfVotes) > 0:
-    negativeSelfVotes = [v for v in selfVotes if v['count'] < 0]
-    positiveSelfVotes = [v for v in selfVotes if v['count'] > 1]
-    if negativeSelfVotes and not positiveSelfVotes:
-      return None
-    else:
-      votes = positiveSelfVotes
-  if not maxVote and len(votes) > 0:
-    maxVote = max(votes, key=lambda x:x['count'])
-  return maxVote
-
-
 def getNeighborhoodsByArea(areaid, user):
-  (blocks, allVotes) = getVotes(areaid, user)
+  (blocks, allVotes) = vote_utils.getVotes(conn, areaid, user)
 
   blocks_by_hoodid = defaultdict(list)
   id_to_label = {}
@@ -161,7 +111,7 @@ def getNeighborhoodsByArea(areaid, user):
   for block in blocks:
     geom = asShape(eval(block['geojson_geom']))
     votes = allVotes[block['geoid10']]
-    maxVote = pickBestVote(votes)
+    maxVote = vote_utils.pickBestVote(votes)
     if maxVote:
       blocks_by_hoodid[maxVote['id']].append(geom)
       id_to_label[maxVote['id']] = maxVote['label']

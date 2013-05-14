@@ -1,4 +1,3 @@
---blocks with negative votes do ... something
 --do something with unassigned blocks?
 --add first-time help?
 --remove password/local-account logins
@@ -6,11 +5,10 @@
 --delete neighborhood
 --add neighborhood
 --save all votes so I can reconstruct if things go bad
-
---figure out what to do about 
+--figure out what to do about brooklyn piers
+--smear the data
 
 --send down metros instead of counties?
 --allow people to fetch their modifications
 
---smear flickr data
 --load the rest of the US
