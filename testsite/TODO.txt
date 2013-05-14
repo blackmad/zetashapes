@@ -1,5 +1,3 @@
---a click and drag mode?
---something is inconsistent with voting, but it's close
 --blocks with negative votes do ... something
 --do something with unassigned blocks?
 --add first-time help?
@@ -7,6 +5,7 @@
 --make an indexish page -- states to counties? autocomplete? geoip?
 --delete neighborhood
 --add neighborhood
+--save all votes so I can reconstruct if things go bad
 
 --figure out what to do about 
 

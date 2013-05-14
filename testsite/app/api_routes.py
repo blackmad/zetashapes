@@ -139,13 +139,14 @@ def citydata():
 
 def pickBestVote(votes):
   maxVote = None
-  selfVote = [v for v in votes if v['source'] == 'self']
-  if len(selfVote) > 0:
-    selfVote = selfVote[0]
-    if selfVote['count'] == -1:
-      votes = [v for v in votes if v['id'] != selfVote['id']]
+  selfVotes = [v for v in votes if v['source'] == 'self']
+  if len(selfVotes) > 0:
+    negativeSelfVotes = [v for v in selfVotes if v['count'] < 0]
+    positiveSelfVotes = [v for v in selfVotes if v['count'] > 1]
+    if negativeSelfVotes and not positiveSelfVotes:
+      return None
     else:
-      maxVote = selfVote
+      votes = positiveSelfVotes
   if not maxVote and len(votes) > 0:
     maxVote = max(votes, key=lambda x:x['count'])
   return maxVote

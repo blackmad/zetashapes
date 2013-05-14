@@ -249,17 +249,12 @@ var MapPage = Backbone.View.extend({
     })
   },
 
-  colorFeature: function(feature, layer) {
-    var popupContent = 'id: ' + feature.properties.id + ' <br>label: ' + this.calculateBestLabel(feature) + ' <br>color: ' + this.calculateColor(feature) +  '<br><br>';
-
-    if (feature.properties) {
-      popupContent += '<pre>' + JSON.stringify(feature.properties) + '</pre>';
-    }
-
+  colorFeature: function(feature, layer, opacity) {
     layer.setStyle({
-      weight: 1,
-      color: this.calculateColor(feature),
-      fillOpacity: 0.3
+      weight: 2,
+      fillOpacity: opacity || 0.3,
+      fillColor: this.calculateColor(feature),
+      color: 'black'
     });
   },
 
@@ -282,7 +277,7 @@ var MapPage = Backbone.View.extend({
     this.lastHighlightedBlocks_ = blocks;
     
     _.each(blocks, _.bind(function(block) {
-      this.toggleBlockVote(block, true);
+      this.forceBlockVote(block);
     }, this))
   },
 
@@ -379,11 +374,12 @@ var MapPage = Backbone.View.extend({
     }
   },
 
-  toggleBlockVote: function(layer, force) {
+  toggleBlockVoteHelper: function(layer, force) {
     var hoodId = this.lastHighlightedNeighborhood_.feature['properties']['id']
     var id = this.calculateBestId(layer.feature)
     this.clickedBlocks_.push(layer.feature);
-    if (id =! hoodId || force) {
+    if (id != hoodId || force) {
+      console.log('adding vote')
       layer.feature.properties['votes'] = [
         {
           count: 1,
@@ -392,6 +388,7 @@ var MapPage = Backbone.View.extend({
         }
       ];
     } else {
+      console.log('removing vote')
       layer.feature.properties['votes'] = []
     }
   
@@ -400,6 +397,14 @@ var MapPage = Backbone.View.extend({
     // if it's in the hood, delete that entry
     // if it's not in the hood, add a self entry?
     // recolor it
+  },
+  
+  toggleBlockVote: function(layer) {
+    this.toggleBlockVoteHelper(layer, false)
+  },
+  
+  forceBlockVote: function(layer) {
+    this.toggleBlockVoteHelper(layer, true)
   },
   
   processBlockClick: function(e) { 
@@ -543,11 +548,7 @@ var MapPage = Backbone.View.extend({
       }, this));
 
     this.neighborhoodLayer_.on('mouseover', _.bind(function(e) {
-      e.layer.setStyle({
-        weight: 1,
-        color: this.calculateColor(e.layer.feature),
-        fillOpacity: 0.9
-      });
+      this.colorFeature(e.layer.feature, e.layer, 0.9);
       
       this.lastHighlightedNeighborhood_ = e.layer;
 
