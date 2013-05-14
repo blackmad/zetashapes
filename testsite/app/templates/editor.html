@@ -5,26 +5,25 @@
 {% block layout %}
     <div class="container-fluid">
       <div class="row-fluid">
-        <div class="span9">
+        <div class="span12">
           <div id="map"></div>
         </div>
-        <div class="span3">
-          <div class="well">
-      <br/>
-        {%- if current_user.is_authenticated() -%}
-          Click on a neighborhood to enter editing mode.
-          <!--'Polygon mode': <button type="button" id="polygonMode" class="btn btn-primary" data-loading-text="Off" data-toggle="button">On</button>-->
-        {%- else -%}
-           If you want to edit the map, please <a href="/login">login</a>
-        {%- endif -%}
-
-      <br/><br/>
-      <div class="exitBlockMode" style="display:none">
-        <button type="button" class="exitBlockModeButton" class="btn btn-primary">Finish Editing</button>
       </div>
-      <span id="neighborhoodInfo"></span>
-          </div>
+      <div class="controls">
+        <br/>
+          {%- if current_user.is_authenticated() -%}
+            Click on a neighborhood to enter editing mode.
+            <!--'Polygon mode': <button type="button" id="polygonMode" class="btn btn-primary" data-loading-text="Off" data-toggle="button">On</button>-->
+          {%- else -%}
+             If you want to edit the map, please <a href="/login">login</a>
+          {%- endif -%}
+
+        <br/><br/>
+        <div class="exitBlockMode" style="display:none">
+          <button type="button" class="exitAndSaveBlockModeButton" class="btn btn-primary">Save Edits</button>
+          <button type="button" class="exitAndUndoBlockModeButton" class="btn btn-primary">Exit and Undo Edits</button>
         </div>
+        <span id="neighborhoodInfo"></span>
       </div>
     </div>
 
@@ -59,12 +58,12 @@
 
 	<script>
     $('.controlBox').button()
-
-    $(
-      new MapPage({
+    var mapPage = null;
+    $(function() {
+      mapPage = new MapPage({
         areaid: '{{ areaid }}',
         api_key: '{{current_user.api_key }}'
       })
-    );
+    });
 	</script>
 {% endblock %}

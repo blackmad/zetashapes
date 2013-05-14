@@ -40,18 +40,18 @@ def support_jsonp(f):
     return decorated_function
 
 
-def makeFeature(row, voteDict):
+def makeFeature(row, voteDict, user):
   return {
     "type": "Feature",
     "geometry": eval(row['geojson_geom']),
     "properties": {
       "id": row['geoid10'],
-      "votes": voteDict[row['geoid10']]
+      "votes": [x for x in [pickBestVote(voteDict[row['geoid10']])] if x]
     }
   }
 
-def makeFeatures(rows, voteDict):
-  return [makeFeature(r, voteDict) for r in rows]
+def makeFeatures(rows, voteDict, user):
+  return [makeFeature(r, voteDict, user) for r in rows]
 
 @app.route('/api/stateCounts', methods=['GET'])
 @support_jsonp
@@ -132,10 +132,24 @@ def citydata():
 
   response = {
     "type": "FeatureCollection",
-    "features": makeFeatures(rows, votes)
+    "features": makeFeatures(rows, votes, user)
   }
 
   return jsonify(response)
+
+def pickBestVote(votes):
+  maxVote = None
+  selfVote = [v for v in votes if v['source'] == 'self']
+  if len(selfVote) > 0:
+    selfVote = selfVote[0]
+    if selfVote['count'] == -1:
+      votes = [v for v in votes if v['id'] != selfVote['id']]
+    else:
+      maxVote = selfVote
+  if not maxVote and len(votes) > 0:
+    maxVote = max(votes, key=lambda x:x['count'])
+  return maxVote
+
 
 def getNeighborhoodsByArea(areaid, user):
   (blocks, allVotes) = getVotes(areaid, user)
@@ -146,18 +160,8 @@ def getNeighborhoodsByArea(areaid, user):
   for block in blocks:
     geom = asShape(eval(block['geojson_geom']))
     votes = allVotes[block['geoid10']]
-    if len(votes):
-      selfVote = [v for v in votes if v['source'] == 'self']
-      if len(selfVote) > 0:
-        selfVote = selfVote[0]
-        if selfVote['count'] == -1:
-          votes = [v for v in votes if v['id'] != selfVote['id']]
-        else:
-          maxVote = selfVote
-      else:
-        maxVote = max(votes, key=lambda x:x['count'])
-        selfVote = None
- 
+    maxVote = pickBestVote(votes)
+    if maxVote:
       blocks_by_hoodid[maxVote['id']].append(geom)
       id_to_label[maxVote['id']] = maxVote['label']
 

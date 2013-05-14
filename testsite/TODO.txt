@@ -1,7 +1,14 @@
 --a click and drag mode?
 --something is inconsistent with voting, but it's close
+--blocks with negative votes do ... something
+--do something with unassigned blocks?
+--add first-time help?
+--remove password/local-account logins
+--make an indexish page -- states to counties? autocomplete? geoip?
+--delete neighborhood
+--add neighborhood
 
---make an indexish page -- states to counties?
+--figure out what to do about 
 
 --send down metros instead of counties?
 --allow people to fetch their modifications
