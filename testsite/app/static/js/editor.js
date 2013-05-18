@@ -512,6 +512,7 @@ var MapPage = Backbone.View.extend({
 
     this.blockLoader_.trigger('loaded');
     var mouseOverCb = function(e) {
+      console.log(e.layer.feature.properties.id);
       this.highlightBlock(e.layer, 0.75);
     }
 
