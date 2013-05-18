@@ -3,20 +3,21 @@ L.SpinMapMixin = {
         var state = !!state;
         if (state) {
             // start spinning !
-            if (!this._spinner) {
-                this._spinner = new Spinner().spin(this._container);
-                this._spinning = 0;
+            console.log('spinnnn');
+            console.log($('#spinner'));
+            $('#spinner').show();
+            if (isNaN(this._spinning)) {
+              this._spinning = 0;
             }
             this._spinning++;
+            console.log(this._spinning);
         }
         else {
             this._spinning--;
+            console.log(this._spinning);
             if (this._spinning <= 0) {
-                // end spinning !
-                if (this._spinner) {
-                    this._spinner.stop();
-                    this._spinner = null;
-                }
+               // end spinning !
+               $('#spinner').hide();
             }
         }
     }

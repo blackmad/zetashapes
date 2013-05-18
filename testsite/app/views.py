@@ -108,7 +108,9 @@ def profile():
         areas=areas,
         twitter_conn=current_app.social.twitter.get_connection(),
         facebook_conn=current_app.social.facebook.get_connection(),
-        github_conn=current_app.social.github.get_connection()
+        github_conn=current_app.social.github.get_connection(),
+        foursquare_conn=current_app.social.foursquare.get_connection(),
+        google_conn=current_app.social.google.get_connection()
     )
 
 

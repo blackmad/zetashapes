@@ -105,31 +105,7 @@ def citydata():
   return jsonify(response)
 
 def getNeighborhoodsByArea(areaid, user):
-  (blocks, allVotes) = vote_utils.getVotes(conn, areaid, user)
-
-  blocks_by_hoodid = defaultdict(list)
-  id_to_label = {}
-
-  for block in blocks:
-    geom = asShape(eval(block['geojson_geom']))
-    votes = allVotes[block['geoid10']]
-    maxVote = vote_utils.pickBestVote(votes)
-    if maxVote:
-      blocks_by_hoodid[maxVote['id']].append(geom)
-      id_to_label[maxVote['id']] = maxVote['label']
-
-  neighborhoods = []
-  for (id, geoms) in blocks_by_hoodid.iteritems():
-    merged = cascaded_union(geoms)
-    geojson = { 
-      'type': 'Feature',
-      'properties': {
-        'id': id,
-        'label': id_to_label[id]
-      },
-      'geometry': mapping(merged)
-    }
-    neighborhoods.append(geojson)
+  neighborhoods = geo_utils.getNeighborhoodsByArea(conn, areaid, user)
   
   response = {
     "type": "FeatureCollection",

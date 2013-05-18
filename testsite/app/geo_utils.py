@@ -1,12 +1,9 @@
 #!/usr/bin/python
 
-from flask import Flask
-import flask_gzip
 import json
 import re
 from functools import wraps
 from collections import namedtuple
-from flask import redirect, request, current_app, jsonify
 import psycopg2
 import psycopg2.extras
 from collections import defaultdict
@@ -16,6 +13,7 @@ from itertools import groupby
 from shapely.ops import cascaded_union
 from shapely.geometry import mapping, asShape
 from shapely import speedups
+import vote_utils
 
 state_codes = {
     'WA': '53', 'DE': '10', 'DC': '11', 'WI': '55', 'WV': '54', 'HI': '15',
@@ -34,15 +32,17 @@ fips_codes = {v:k for k, v in state_codes.iteritems()}
 def areaInfo(rows):
   responses = []
   for r in rows:
-    responses.append({
+    d = {
       'displayName': "%s, %s" % (r['name10'], fips_codes[r['statefp10']]),
       'name': r['name10'],
       'state': fips_codes[r['statefp10']],
       'areaid': r['geoid10'],
       'lat': r['intptlat10'],
       'lng': r['intptlon10'],
-      'bbox': json.loads(r['bbox'])
-    })
+    }
+    if 'bbox' in r:
+      d['bbox'] = json.loads(r['bbox'])
+    responses.append(d)
   return responses
 
 def getNearestCounties(conn, lat, lng):
@@ -52,7 +52,40 @@ def getNearestCounties(conn, lat, lng):
   return areaInfo(rows)
 
 def getInfoForAreaIds(conn, areaids):
-  cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-  cur.execute("""select *,ST_AsGeoJson(ST_Envelope(geom)) as bbox  FROM tl_2010_us_county10 WHERE geoid10 IN %s""", (tuple(areaids),))
-  rows = cur.fetchall()
-  return areaInfo(rows)
+  if areaids:
+    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    cur.execute("""select *,ST_AsGeoJson(ST_Envelope(geom)) as bbox  FROM tl_2010_us_county10 WHERE geoid10 IN %s""", (tuple(areaids),))
+    rows = cur.fetchall()
+    return areaInfo(rows)
+  else:
+    return []
+
+def getNeighborhoodsByArea(conn, areaid, user):
+  (blocks, allVotes) = vote_utils.getVotes(conn, areaid, user)
+
+  blocks_by_hoodid = defaultdict(list)
+  id_to_label = {}
+
+  for block in blocks:
+    geom = asShape(eval(block['geojson_geom']))
+    votes = allVotes[block['geoid10']]
+    maxVote = vote_utils.pickBestVote(votes)
+    if maxVote:
+      blocks_by_hoodid[maxVote['id']].append(geom)
+      id_to_label[maxVote['id']] = maxVote['label']
+
+  neighborhoods = []
+  for (id, geoms) in blocks_by_hoodid.iteritems():
+    merged = cascaded_union(geoms)
+    geojson = { 
+      'type': 'Feature',
+      'properties': {
+        'id': id,
+        'label': id_to_label[id]
+      },
+      'geometry': mapping(merged)
+    }
+    neighborhoods.append(geojson)
+  return neighborhoods
+  
+

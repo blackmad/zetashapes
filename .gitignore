@@ -3,9 +3,11 @@
 .settings
 .project
 .pydevproject
-app/data/*
-app/static/.webaassets-cache/*
-!app/static/.webassets-cache/.gitignore
+testsite/app/data/*
+testsite/app/static/.webaassets-cache/*
+!testsite/app/static/.webassets-cache/.gitignore
 *.pyc
-app/config/*.yml
-!app/config/app.yml
+testsite/app/config/*.yml
+!testsite/app/config/app.yml
+app/data/GeoLiteCity.dat
+testsite/app/config/credentials.yml

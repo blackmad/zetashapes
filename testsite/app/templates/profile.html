@@ -29,6 +29,10 @@
       {{ twitter_conn.display_name }}!
     {% elif facebook_conn %}
       {{ facebook_conn.display_name }}!
+    {% elif foursquare_conn %}
+      {{ foursquare_conn.display_name }}!
+    {% elif google_conn %}
+      {{ google_conn.display_name }}!
     {% else %}
       I'm sorry, I forget your name.
     {% endif %}
@@ -44,7 +48,8 @@
      {% endfor %}
    </ul>
   {% else %}
-    You haven't edited any areas yet, why not start?
+    You haven't edited any areas yet, why not start by searching for a city you know well?<br/>
+    {% include "_place_search.html" %}
   {% endif %}
 </div>
 
@@ -52,6 +57,8 @@
 <div class="row">
   {{ show_provider_button('twitter', 'Twitter', twitter_conn) }}
   {{ show_provider_button('facebook', 'Facebook', facebook_conn) }}
+  {{ show_provider_button('foursquare', 'Foursquare', foursquare_conn) }}
+  {{ show_provider_button('google', 'Google', google_conn) }}
 </div>
 <!--
 <div class="row" style="margin-top:50px;">

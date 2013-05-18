@@ -1,6 +1,23 @@
+- add 4sq buttons
+- I still feel a little sad when I make some edits and then am dropped back to a map that doesn't reflect my edits at all
+- s/placel/place on the homepage
+- Style these buttons! http://cl.ly/image/2V0i02413d12
+- I made some edits to Prospect Heights, and then when I came back it had disappeared: http://cl.ly/image/3Z0f3y360A0N
+- I went in to edit Adelphi just now and got this: http://cl.ly/image/41322D350N2g
+- maybe change the hover state or add a tooltip since it's not clear what clicking is going to do (especially on already colored blocks?)
+- 3. Color overlays onhover are sometimes too heavy: http://cl.ly/image/160V2u2a0u2Y Consider decreasing opacity a tad adding a 'glow' around the neighborhood outline instead, e.g., { -box-shadow: #fullopacityhex inset 0 2px 2px  }
+- more smoothing
+- 5. Still want all that status stuff on the top, not the left. Say like so: http://cl.ly/image/3H0q083Y0119 ("editing tips" would be all the sidebar text: http://cl.ly/image/0B2W2z1Z3Y3J which could be shown the first time the user edits something, after hidden behind a toggle/link.
+- speed up the map
+- gif spinner
+- maybe linkify "why not start" to somewheres?
+
+
+--finish homepage
+
+
 --do something with unassigned blocks?
 --add first-time help?
---make an indexish page -- states to counties? autocomplete? geoip?
 --delete neighborhood
 --add neighborhood
 --save all votes so I can reconstruct if things go bad

@@ -7,21 +7,33 @@
       <div class="row-fluid">
         <div class="span12">
           <div id="map"></div>
+          <img src="/static/img/spinner.gif" id="spinner"/>
         </div>
       </div>
-      <div class="controls">
+      <div class="controls neighborhoodMode">
         <br/>
+        <div class="neighborhoodControls">
           {%- if current_user.is_authenticated() -%}
             Click on a neighborhood to enter editing mode.
+            <br/>
+            (add neighborhood coming soon)
             <!--'Polygon mode': <button type="button" id="polygonMode" class="btn btn-primary" data-loading-text="Off" data-toggle="button">On</button>-->
           {%- else -%}
              If you want to edit the map, please <a href="/login">login</a>
           {%- endif -%}
+        </div>
 
-        <br/><br/>
-        <div class="exitBlockMode" style="display:none">
+        <div class="exitBlockMode">
+          Click on a colored block to remove it from the current neighborhood, click on a clear block to add it.
+          <hr/>
+          Removed blocks will remain unlabeled until you edit a different neighborhood and attach them there.
+          <hr/>
+          To make a bigger addition, shift-click to begin drawing a polygon, doubleclick or shift-click to end it.
+          <hr/>
+
           <button type="button" class="exitAndSaveBlockModeButton" class="btn btn-primary">Save Edits</button>
           <button type="button" class="exitAndUndoBlockModeButton" class="btn btn-primary">Exit and Undo Edits</button>
+          (delete neighborhood coming soon)
         </div>
         <span id="neighborhoodInfo"></span>
       </div>

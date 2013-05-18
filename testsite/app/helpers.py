@@ -17,7 +17,7 @@ class Config(BaseConfig):
             if key in os.environ:
                 self[key] = os.environ[key]
 
-        for key_prefix in ['TWITTER', 'FACEBOOK', 'GITHUB']:
+        for key_prefix in ['TWITTER', 'FACEBOOK', 'GITHUB', 'GOOGLE', 'FOURSQUARE']:
             for key_suffix in ['key', 'secret']:
                 ev = '%s_CONSUMER_%s' % (key_prefix, key_suffix.upper())
                 if ev in os.environ:

@@ -1,0 +1,17 @@
+<script src="/static/js/places.js"></script>
+        <input type="text" data-provide="typeahead" id="cities" autocomplete="off" placeholder="Enter a US city">
+        <script>
+          $(function() {
+            var sel = $('#cities');
+            var source = _.map(cityToCounties, function(c) { return c[0]; })
+            sel.typeahead({
+              source: source,
+              updater: function(selection){
+                console.log("You selected: " + selection)
+                var f = _.find(cityToCounties, function(c) { return c[0] == selection; })
+                window.location = '/editor/' + f[1];
+              }
+            });
+          });
+        </script>
+

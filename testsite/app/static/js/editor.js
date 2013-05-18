@@ -324,7 +324,7 @@ var MapPage = Backbone.View.extend({
   },
 
   exitBlockMode: function(vote) {
-    $('.exitBlockMode').hide();
+    $('.controls').toggleClass('blockMode neighborhoodMode');
     this.inBlockMode_ = false;
     this.map_.removeLayer(this.blockLayer_);
     this.map_.addLayer(this.neighborhoodLayer_);
@@ -362,7 +362,7 @@ var MapPage = Backbone.View.extend({
   },
 
   reallyEnterBlockMode: function() {
-    $('.exitBlockMode').show();
+    $('.controls').toggleClass('blockMode neighborhoodMode');
     // set some boolean
     this.inBlockMode_ = true;
     this.clickedBlocks_ = [];
@@ -374,16 +374,16 @@ var MapPage = Backbone.View.extend({
       var id = this.calculateBestId(layer.feature)
       this.colorBlock(layer);
     }, this));
+    this.blockLayer_.fire('data:loaded');
   },
 
   enterBlockMode: function() {
     this.map_.removeLayer(this.neighborhoodLayer_);
     this.map_.addLayer(this.blockLayer_);
+    this.blockLayer_.fire('data:loading');
     if (this.blocksLoaded_) {
       this.reallyEnterBlockMode();
     } else {
-      this.blockLayer_.fire('data:loading');
-
       this.blockLoader_.once('loaded', _.bind(function() {
         console.log('should hide spinner');
         this.reallyEnterBlockMode();
@@ -486,7 +486,6 @@ var MapPage = Backbone.View.extend({
     var hoodId = this.lastHighlightedNeighborhood_.feature['properties']['id'];
     var id = this.calculateBestId(layer.feature);
     var color = this.calculateColor(this.lastHighlightedNeighborhood_.feature);
-    console.log(color);
     if ((id == hoodId && inverted) || 
         (id != hoodId && !inverted)) {
       layer.setStyle({
@@ -509,7 +508,6 @@ var MapPage = Backbone.View.extend({
   cacheBlockData: function(geojson) { 
     console.log('loaded block layer');
     this.blocksLoaded_ = true;
-    this.blockLayer_.fire('data:loaded');
     this.blockLayer_.addData(geojson)
 
     this.blockLoader_.trigger('loaded');
@@ -573,10 +571,7 @@ var MapPage = Backbone.View.extend({
       this.lastHighlightedNeighborhood_ = e.layer;
 
       $('#neighborhoodInfo').html(
-        'id<br>' +
-        e.layer.feature.properties.id +
-        '<br>label<br>' +
-        this.calculateBestLabel(e.layer.feature)
+        '<h2>' + this.calculateBestLabel(e.layer.feature) + '</h2>'
       );
     }, this));
 
