@@ -105,7 +105,7 @@ def citydata():
   return jsonify(response)
 
 def getNeighborhoodsByArea(areaid, user):
-  neighborhoods = geo_utils.getNeighborhoodsByArea(conn, areaid, user)
+  neighborhoods = geo_utils.getNeighborhoodsGeoJsonByArea(conn, areaid, user)
   
   response = {
     "type": "FeatureCollection",
@@ -235,7 +235,17 @@ def do_vote():
           print 'matched'
         else:
           print 'didnot match'
-          modifyUsersVoteCount(cur, vote.blockid, existing_vote['woe_id'], -1*vote['weight'])
+          print existing_vote
+          print vote
+          print existing_vote['woe_id']
+          print vote.weight
+          try:
+            modifyUsersVoteCount(cur, user['level'], vote.blockid, existing_vote['woe_id'], -1*vote.weight)
+          except Exception as inst:
+            print 'existing vote: %s' % existing_vote
+            print 'vote'
+            print vote
+            raise inst
           print cur.mogrify("""DELETE FROM user_votes WHERE userid=%s AND blockid=%s AND woe_id=%s""", (
             userId, vote.blockid, existing_vote['woe_id']))
 

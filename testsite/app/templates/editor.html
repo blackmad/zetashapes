@@ -11,12 +11,10 @@
         </div>
       </div>
       <div class="controls neighborhoodMode">
-        <br/>
-        <div class="neighborhoodControls">
+        <div class="neighborhoodControls nohover">
           {%- if current_user.is_authenticated() -%}
-            Click on a neighborhood to enter editing mode.
-            <br/>
-            (add neighborhood coming soon)
+            <span class="titleHelp nohover">Click on a neighborhood to edit its boundary</span>
+            <span class="titleHelp hover">Click to edit:</span> <span class="neighborhoodInfo hover"></span>
             <!--'Polygon mode': <button type="button" id="polygonMode" class="btn btn-primary" data-loading-text="Off" data-toggle="button">On</button>-->
           {%- else -%}
              If you want to edit the map, please <a href="/login">login</a>
@@ -24,6 +22,20 @@
         </div>
 
         <div class="exitBlockMode">
+          <span class="titleHelp">Now editing:</span> <span class="neighborhoodInfo"></span>
+          <button type="button" class="exitAndSaveBlockModeButton" class="btn btn-primary">Save Edits</button>
+          <button type="button" class="exitAndUndoBlockModeButton" class="btn btn-primary">Exit and Undo Edits</button>
+          <a href="#" data-toggle="tooltip" title="instructions" class="helpButton">Editing Instructions</a>
+        </div>
+      </div>
+    </div>
+
+
+<div class="modal hide fade" id="helpModal">
+  <div class="modal-header">
+    <h3>Editing Instructions</h3>
+  </div>
+  <div class="modal-body">
           Click on a colored block to remove it from the current neighborhood, click on a clear block to add it.
           <hr/>
           Removed blocks will remain unlabeled until you edit a different neighborhood and attach them there.
@@ -31,13 +43,10 @@
           To make a bigger addition, shift-click to begin drawing a polygon, doubleclick or shift-click to end it.
           <hr/>
 
-          <button type="button" class="exitAndSaveBlockModeButton" class="btn btn-primary">Save Edits</button>
-          <button type="button" class="exitAndUndoBlockModeButton" class="btn btn-primary">Exit and Undo Edits</button>
           (delete neighborhood coming soon)
-        </div>
-        <span id="neighborhoodInfo"></span>
-      </div>
-    </div>
+  </div>
+</div>
+
 
 <div class="modal hide fade" id="neighborhoodSelectModal">
   <div class="modal-header">

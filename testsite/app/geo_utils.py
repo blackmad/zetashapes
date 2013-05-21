@@ -60,6 +60,19 @@ def getInfoForAreaIds(conn, areaids):
   else:
     return []
 
+def getBlocks(conn, blockids):
+  if blockids:
+    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    cur.execute("""select geoid10,ST_AsGeoJson(geom) as geojson FROM tabblock10 WHERE geoid10 IN %s""", (tuple(blockids),))
+    rows = cur.fetchall()
+    d = {}
+    for r in rows:
+      d[r['geoid10']] = r['geojson']
+    return d
+  else:
+    return {}
+
+
 def getNeighborhoodsByArea(conn, areaid, user):
   (blocks, allVotes) = vote_utils.getVotes(conn, areaid, user)
 
@@ -74,9 +87,16 @@ def getNeighborhoodsByArea(conn, areaid, user):
       blocks_by_hoodid[maxVote['id']].append(geom)
       id_to_label[maxVote['id']] = maxVote['label']
 
-  neighborhoods = []
+  hoods = {}
   for (id, geoms) in blocks_by_hoodid.iteritems():
-    merged = cascaded_union(geoms)
+    hoods[id] = cascaded_union(geoms)
+  return (hoods, id_to_label)
+
+def getNeighborhoodsGeoJsonByArea(conn, areaid, user):
+  (hoods, id_to_label) = getNeighborhoodsByArea(conn, areaid, user)
+  neighborhoods = []
+
+  for (id, merged) in hoods.iteritems():
     geojson = { 
       'type': 'Feature',
       'properties': {

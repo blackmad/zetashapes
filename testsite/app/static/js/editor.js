@@ -221,6 +221,10 @@ var MapPage = Backbone.View.extend({
     } else {
       this.fetchData(this.options.areaid);
     }
+
+    $('.helpButton').click(function() {
+      $('#helpModal').modal();
+    })
   },
 
   renderAreaInfo: function(data) {
@@ -567,16 +571,18 @@ var MapPage = Backbone.View.extend({
       }, this));
 
     this.neighborhoodLayer_.on('mouseover', _.bind(function(e) {
+      $('.neighborhoodControls').toggleClass('hover nohover');
       this.colorFeature(e.layer.feature, e.layer, 0.9);
       
       this.lastHighlightedNeighborhood_ = e.layer;
 
-      $('#neighborhoodInfo').html(
-        '<h2>' + this.calculateBestLabel(e.layer.feature) + '</h2>'
+      $('.neighborhoodInfo').html(
+        this.calculateBestLabel(e.layer.feature)
       );
     }, this));
 
     var mouseOutCb = function(e) {
+      $('.neighborhoodControls').toggleClass('hover nohover');
       // console.log(e.layer.feature['properties']['id']);
       this.colorFeature(e.layer.feature, e.layer);
     }

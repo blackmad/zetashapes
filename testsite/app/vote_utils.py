@@ -33,6 +33,10 @@ def pickBestVote(votes, preferSmear=True):
   if not maxVote and len(votes) > 0:
     maxVote = max(votes, key=lambda x:x['count'])
 
+  blockrVotes = [v for v in votes if v['source'] == 'blockr']
+  if preferSmear and blockrVotes and not positiveSelfVotes:
+    return blockrVotes[0]
+
   smearVotes = [v for v in votes if v['source'] == 'smear']
   if preferSmear and smearVotes and not positiveSelfVotes:
     return smearVotes[0]
