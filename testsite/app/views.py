@@ -21,15 +21,20 @@ gi = pygeoip.GeoIP('app/data/GeoLiteCity.dat', pygeoip.MEMORY_CACHE)
 import psycopg2
 conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
 
+
+@app.route('/api/test')
+def test():
+    return render_template('index.html', total_users=0, areas=[])
+
 @app.route('/')
 def index():
-    geoip = gi.record_by_addr(request.remote_addr)
-    print geoip
+    print request.remote_addr
     areas = []
-    if geoip['country_code'] == 'US':
-      areas = geo_utils.getNearestCounties(conn, geoip['latitude'], geoip['longitude'])
-      print areas
-    
+    if request.access_route:
+      geoip = gi.record_by_addr(request.remote_addr)
+      if geoip and 'country_code' in geoip and  geoip['country_code'] == 'US':
+        areas = geo_utils.getNearestCounties(conn, geoip['latitude'], geoip['longitude'])
+
     return render_template('index.html', total_users=User.query.count(), areas=areas)
 
 

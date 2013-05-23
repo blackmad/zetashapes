@@ -44,6 +44,7 @@ var MapPage = Backbone.View.extend({
     $.ajax({
       dataType: 'json',
       url: '/api/vote',
+      type: 'POST',
       data: { 
         key: this.apiKey_,
         blockid: blockids.join(','),
@@ -349,6 +350,7 @@ var MapPage = Backbone.View.extend({
         $.ajax({
           dataType: 'json',
           url: '/api/vote',
+          type: 'POST',
           data: { 
             key: this.apiKey_,
             votes: voteString
@@ -516,6 +518,7 @@ var MapPage = Backbone.View.extend({
 
     this.blockLoader_.trigger('loaded');
     var mouseOverCb = function(e) {
+      console.log(e);
       console.log(e.layer.feature.properties.id);
       this.highlightBlock(e.layer, 0.75);
     }
@@ -571,7 +574,8 @@ var MapPage = Backbone.View.extend({
       }, this));
 
     this.neighborhoodLayer_.on('mouseover', _.bind(function(e) {
-      $('.neighborhoodControls').toggleClass('hover nohover');
+      $('.neighborhoodControls').addClass('hover');
+      $('.neighborhoodControls').removeClass('nohover');
       this.colorFeature(e.layer.feature, e.layer, 0.9);
       
       this.lastHighlightedNeighborhood_ = e.layer;
@@ -582,7 +586,8 @@ var MapPage = Backbone.View.extend({
     }, this));
 
     var mouseOutCb = function(e) {
-      $('.neighborhoodControls').toggleClass('hover nohover');
+      $('.neighborhoodControls').addClass('nohover');
+      $('.neighborhoodControls').removeClass('hover');
       // console.log(e.layer.feature['properties']['id']);
       this.colorFeature(e.layer.feature, e.layer);
     }

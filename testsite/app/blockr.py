@@ -47,6 +47,8 @@ places = {}
 names = {}
 blocks = {}
 
+do_cache = False
+
 def load_points(nids):
     places = {} 
 
@@ -96,8 +98,9 @@ else:
     blocks = [poly.__geo_interface__ for poly in lines]
 
 if not os.path.exists(areaid + '.cache'):
-    print >>sys.stderr, "Caching points, blocks, and names ..."
-    pickle.dump((names, blocks, places), file(areaid + ".cache", "w"), -1)
+    if do_cache:
+      print >>sys.stderr, "Caching points, blocks, and names ..."
+      pickle.dump((names, blocks, places), file(areaid + ".cache", "w"), -1)
     blocks = map(asShape, blocks)
 
 points = []
