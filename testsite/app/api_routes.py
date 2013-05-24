@@ -9,7 +9,7 @@ import json
 import re
 from functools import wraps
 from collections import namedtuple
-from flask import redirect, request, current_app, jsonify
+from flask import redirect, request, current_app
 import psycopg2
 import psycopg2.extras
 from collections import defaultdict
@@ -23,6 +23,8 @@ import geo_utils
 import vote_utils
 import sqlalchemy.pool as pool
 
+def jsonify(*args, **kwargs):
+  return current_app.response_class(json.dumps(dict(*args, **kwargs), indent=None), mimetype='application/json')
 
 if speedups.available:
   print 'shapely speedups available!!!!'

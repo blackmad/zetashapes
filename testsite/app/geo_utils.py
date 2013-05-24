@@ -72,11 +72,12 @@ def getBlocks(conn, blockids):
   else:
     return {}
 
-
+NeighborhoodArea = namedtuple('NeighborhoodArea', ['shape', 'blockids'])
 def getNeighborhoodsByArea(conn, areaid, user):
   (blocks, allVotes) = vote_utils.getVotes(conn, areaid, user)
 
   blocks_by_hoodid = defaultdict(list)
+  blockids_by_hoodid = defaultdict(list)
   id_to_label = {}
 
   for block in blocks:
@@ -85,25 +86,27 @@ def getNeighborhoodsByArea(conn, areaid, user):
     maxVote = vote_utils.pickBestVote(votes)
     if maxVote:
       blocks_by_hoodid[maxVote['id']].append(geom)
+      blockids_by_hoodid[maxVote['id']].append(block['geoid10'])
       id_to_label[maxVote['id']] = maxVote['label']
 
   hoods = {}
   for (id, geoms) in blocks_by_hoodid.iteritems():
-    hoods[id] = cascaded_union(geoms)
+    hoods[id] = NeighborhoodArea(cascaded_union(geoms), blockids_by_hoodid[id])
   return (hoods, id_to_label)
 
 def getNeighborhoodsGeoJsonByArea(conn, areaid, user):
   (hoods, id_to_label) = getNeighborhoodsByArea(conn, areaid, user)
   neighborhoods = []
 
-  for (id, merged) in hoods.iteritems():
+  for (id, nhoodarea) in hoods.iteritems():
     geojson = { 
       'type': 'Feature',
       'properties': {
         'id': id,
-        'label': id_to_label[id]
+        'label': id_to_label[id],
+        'blockids': nhoodarea.blockids
       },
-      'geometry': mapping(merged)
+      'geometry': mapping(nhoodarea.shape)
     }
     neighborhoods.append(geojson)
   return neighborhoods

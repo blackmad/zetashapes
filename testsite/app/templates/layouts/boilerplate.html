@@ -30,6 +30,12 @@
 
   <script src="/static/js/bootstrap.min.js"></script>
 
+  <script>
+    if (window.location.host == 'www.zetashapes.com') {
+      window.location.host = 'zetashapes.com';
+    }
+  </script>
+
   {% if google_analytics_id %}
   <script type="text/javascript">
     var _gaq = _gaq || [];
