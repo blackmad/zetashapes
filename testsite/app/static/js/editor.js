@@ -128,11 +128,7 @@ var MapPage = Backbone.View.extend({
     return _.max(feature.properties['votes'], function(v) { return v.count })
   },
   calculateBestId: function(feature) {
-   var bestVote = this.calculateBestVote(feature);
-    if (!bestVote) {
-      return null
-    }
-    return bestVote.id;
+    return feature['properties']['id'];
   },
 
   calculateBestLabel: function(feature) {
@@ -164,6 +160,13 @@ var MapPage = Backbone.View.extend({
     this.$selectedNeighborhoodSpan.text(label);
   },
 
+  recolorNeighborhoods: function() {
+    console.log(this.neighborhoodIdToLayerMap_);
+    _.each(this.neighborhoodIdToLayerMap_, _.bind(function(layer, id, list) {
+      this.colorFeature(layer.feature, layer); 
+    }, this));
+  },
+
   storeLabels: function(labelData) {
     this.labels_ = labelData['labels']; 
     var select = $('.neighborhoodSelect');
@@ -177,11 +180,28 @@ var MapPage = Backbone.View.extend({
   initialize: function() {
     this.inBlockMode_ = false;
     this.idToLayerMap_ = {}
+    this.idToFeatureMap_ = {}
     this.inPolygonMode_ = false;
     this.$selectedNeighborhoodSpan = $('#selectedNeighborhood');
+    this.neighborhoodIdToLayerMap_ = {};
 
     function onEachFeature(feature, layer) {
       this.idToLayerMap_[feature.properties.id] = layer;
+      this.idToFeatureMap_[feature.properties.id] = feature;
+      var mouseOverCb = function(e) {
+        layer.feature = feature;
+        this.highlightBlock(layer, 0.75);
+      }
+
+      var mouseOutCb = function(e) {
+        layer.feature = feature
+        this.colorBlock(layer);
+      }
+
+      layer.feature = feature;
+      layer.on('mouseover', _.bind(mouseOverCb, this));
+      layer.on('mouseout', _.bind(mouseOutCb, this))
+      layer.on('click', _.bind(this.processBlockClick, this, layer))
     }
 
     this.blockLayer_ = L.geoJson(null, {
@@ -331,12 +351,13 @@ var MapPage = Backbone.View.extend({
   exitBlockMode: function(vote) {
     $('.controls').toggleClass('blockMode neighborhoodMode');
     this.inBlockMode_ = false;
-    this.map_.removeLayer(this.blockLayer_);
-    this.map_.addLayer(this.neighborhoodLayer_);
+    this.hideBlocks();
+    //this.map_.removeLayer(this.blockLayer_);
+    //this.map_.addLayer(this.neighborhoodLayer_);
 
     if (vote) {
       // go through clicked blocks
-      this.colorFeature(this.lastHighlightedNeighborhood_.feature, this.lastHighlightedNeighborhood_);
+      this.colorFeature(this.lastHighlightedNeighborhood_.feature, this.lastHighlightedNeighborhood_.layer);
       var hoodId = this.lastHighlightedNeighborhood_.feature['properties']['id']
       var voteString = _.map(this.clickedBlocks_, function(feature) {
         if (feature.properties['votes'].length == 0) {
@@ -359,6 +380,7 @@ var MapPage = Backbone.View.extend({
         });
       }
     }
+    this.recolorNeighborhoods();
   },
 
   updateHoods: function(geojson) {
@@ -373,19 +395,19 @@ var MapPage = Backbone.View.extend({
     this.inBlockMode_ = true;
     this.clickedBlocks_ = [];
     // swap in the block layer
-    this.map_.fitBounds(this.lastHighlightedNeighborhood_.getBounds());
+    this.map_.fitBounds(this.lastHighlightedNeighborhood_.layer.getBounds());
     console.log(this.lastHighlightedNeighborhood_.feature['properties']);
     var hoodId = this.lastHighlightedNeighborhood_.feature['properties']['id']
     _.each(this.idToLayerMap_, _.bind(function(layer, id, list) {
-      var id = this.calculateBestId(layer.feature)
       this.colorBlock(layer);
     }, this));
     this.blockLayer_.fire('data:loaded');
   },
 
   enterBlockMode: function() {
-    this.map_.removeLayer(this.neighborhoodLayer_);
-    this.map_.addLayer(this.blockLayer_);
+    this.hideNeighborhoods();
+    //this.map_.removeLayer(this.neighborhoodLayer_);
+    //this.map_.addLayer(this.blockLayer_);
     this.blockLayer_.fire('data:loading');
     if (this.blocksLoaded_) {
       this.reallyEnterBlockMode();
@@ -395,6 +417,24 @@ var MapPage = Backbone.View.extend({
         this.reallyEnterBlockMode();
       }, this));
     }
+  },
+
+  hideBlocks: function() {
+    this.neighborhoodLayer_.bringToFront()
+    this.blockLayer_.setStyle({
+      'weight': 0.0,
+      'fillOpacity': 0.0,
+      'color': 'red'
+    });
+  },
+
+  hideNeighborhoods: function() {
+    this.blockLayer_.bringToFront()
+    this.neighborhoodLayer_.setStyle({
+      'weight': 0.0,
+      'fillOpacity': 0.0,
+      'color': 'orange'
+    });
   },
 
   toggleBlockVoteHelper: function(layer, force) {
@@ -430,7 +470,7 @@ var MapPage = Backbone.View.extend({
     this.toggleBlockVoteHelper(layer, true)
   },
   
-  processBlockClick: function(e) { 
+  processBlockClick: function(layer, e) { 
     if (e.originalEvent.shiftKey) {
       if (!this.inPolygonMode_) {
         this.currentPaintLine_ = new L.Polygon([cloneLatLng(e.latlng), cloneLatLng(e.latlng)]);
@@ -439,12 +479,12 @@ var MapPage = Backbone.View.extend({
         this.currentPaintLine_.on('dblclick', _.bind(this.processPolygonDoubleClick, this))
       }
 
-      console.log('toggling polygon mode');
       this.lastHighlightedBlocks_ = [];
 
       this.togglePolygonMode();
+      console.log('toggling polygon mode: we are now in polygon mode?' + this.inPolygonMode_);
     } else {
-      this.toggleBlockVote(e.layer);
+      this.toggleBlockVote(layer);
     }
   }, 
 
@@ -515,25 +555,17 @@ var MapPage = Backbone.View.extend({
     console.log('loaded block layer');
     this.blocksLoaded_ = true;
     this.blockLayer_.addData(geojson)
+    this.map_.addLayer(this.blockLayer_);
+    this.hideBlocks();
 
     this.blockLoader_.trigger('loaded');
-    var mouseOverCb = function(e) {
-      console.log(e);
-      console.log(e.layer.feature.properties.id);
-      this.highlightBlock(e.layer, 0.75);
-    }
-
-    var mouseOutCb = function(e) {
-      this.colorBlock(e.layer);
-    }
-
     this.map_.boxZoom.disable();
-    this.blockLayer_.on('mouseover', _.bind(mouseOverCb, this));
-    this.blockLayer_.on('mouseout', _.bind(mouseOutCb, this))
-    this.blockLayer_.on('click', _.bind(this.processBlockClick, this))
   },
-
+   
   onEachNeighborhoodFeature: function(feature, layer) {
+      layer.feature = feature;
+      this.neighborhoodIdToLayerMap_[this.calculateBestId(feature)] = layer;
+      console.log(this.neighborhoodIdToLayerMap_);
       if (!this.centered) {
         window.console.log(feature);
         if (feature.geometry.type == "Polygon") {
@@ -544,6 +576,32 @@ var MapPage = Backbone.View.extend({
         this.centered = true;
       } 
       this.colorFeature(feature, layer); 
+
+      layer.on('mouseover', _.bind(function(e) {
+        $('.neighborhoodControls').addClass('hover');
+        $('.neighborhoodControls').removeClass('nohover');
+        this.colorFeature(feature, layer, 0.9);
+        
+        // hack, only needed by the getbounds call?
+        this.lastHighlightedNeighborhood_ = {
+          'layer': layer,
+          'feature': feature
+        }
+        console.log(feature['properties']['id'] + ' mouse over');
+
+        $('.neighborhoodInfo').html(
+          this.calculateBestLabel(feature)
+        );
+      }, this));
+
+      var mouseOutCb = function(e) {
+        $('.neighborhoodControls').addClass('nohover');
+        $('.neighborhoodControls').removeClass('hover');
+        console.log(feature['properties']['id'] + ' mouse out');
+        this.colorFeature(feature, layer);
+      }
+
+    layer.on('mouseout', _.bind(mouseOutCb, this))
   },
 
   renderData: function(geojson) {
@@ -566,32 +624,19 @@ var MapPage = Backbone.View.extend({
     this.map_.on('mousemove', _.bind(function(e) {
         // console.log(e)
         if (this.inPolygonMode()) {
+          console.log('moving in poly mode');
           if (this.currentPaintLine_) {
-            var lastIndex = this.currentPaintLine_.getLatLngs().length - 1
+            console.log('moving in poly mode with a paint line');
+            var lastIndex = this.currentPaintLine_.getLatLngs().length - 1;
+            if (lastIndex == 0) {
+              lastIndex = 1;
+            }
+            
+            console.log(this.currentPaintLine_.getLatLngs())
             this.currentPaintLine_.spliceLatLngs(lastIndex, 1, cloneLatLng(e.latlng));
+            console.log(this.currentPaintLine_.getLatLngs())
           }
         } 
       }, this));
-
-    this.neighborhoodLayer_.on('mouseover', _.bind(function(e) {
-      $('.neighborhoodControls').addClass('hover');
-      $('.neighborhoodControls').removeClass('nohover');
-      this.colorFeature(e.layer.feature, e.layer, 0.9);
-      
-      this.lastHighlightedNeighborhood_ = e.layer;
-
-      $('.neighborhoodInfo').html(
-        this.calculateBestLabel(e.layer.feature)
-      );
-    }, this));
-
-    var mouseOutCb = function(e) {
-      $('.neighborhoodControls').addClass('nohover');
-      $('.neighborhoodControls').removeClass('hover');
-      // console.log(e.layer.feature['properties']['id']);
-      this.colorFeature(e.layer.feature, e.layer);
-    }
-
-    this.neighborhoodLayer_.on('mouseout', _.bind(mouseOutCb, this))
   }
 });
