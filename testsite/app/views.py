@@ -4,7 +4,9 @@ from flask.ext.security import LoginForm, current_user, login_required, \
     login_user
 from flask.ext.social.utils import get_provider_or_404
 from flask.ext.social.views import connect_handler
+from .forms import RegisterForm
 
+from .forms import RegisterForm
 import geo_utils
 import vote_utils
 
@@ -58,6 +60,7 @@ def register(provider_id=None):
         return redirect(request.referrer or '/')
 
     print 'HELLLLLLOOOOO'
+    form = RegisterForm()
 
     if provider_id:
         print provider_id
@@ -70,11 +73,14 @@ def register(provider_id=None):
     print 'true?'
     print provider
     print connection_values
-    if provider and connection_values:
+    print form.validate_on_submit()
+    print form.email.data
+
+    if provider and connection_values and form.validate_on_submit():
         char_set = string.ascii_uppercase + string.digits
         ds = current_app.security.datastore
         user = ds.create_user(
-          email=''.join(random.sample(char_set*32,32)) + '@test.com',
+          email=form.email.data,
           password=''.join(random.sample(char_set*32,32))
         )
         user.api_key = ''.join(random.sample(char_set*32,32))
@@ -97,8 +103,11 @@ def register(provider_id=None):
         return render_template('thanks.html', user=user)
 
     login_failed = int(request.args.get('login_failed', 0))
+    print "login failed? "
+    print login_failed
 
     return render_template('register.html',
+                           form=form,
                            provider=provider,
                            login_failed=login_failed,
                            connection_values=connection_values)

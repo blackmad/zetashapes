@@ -12,3 +12,15 @@ class UniqueUser(object):
         if current_app.security.datastore.find_user(email=field.data):
             raise ValidationError(self.message)
 
+validators = {
+    'email': [
+        Required(),
+        Email(),
+        UniqueUser(message='Email address is associated with '
+                           'an existing account')
+    ]
+}
+
+
+class RegisterForm(Form):
+    email = TextField('Email', validators['email'])
