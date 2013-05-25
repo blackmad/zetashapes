@@ -66,16 +66,6 @@ var MapPage = Backbone.View.extend({
     }, this));
   },
 
-  storeLabels: function(labelData) {
-    this.labels_ = labelData['labels']; 
-    var select = $('.neighborhoodSelect');
-
-    // sort by name?
-    _.each(this.labels_, function(label) {
-      select.append($('<option>', { value: label['id'] }).text(label['label']));
-    });
-  },
-  
   toggleDrawMode: function(one, two) {
     if (this.drawMode_ == one) {
       this.drawMode_ = two;
@@ -143,7 +133,6 @@ var MapPage = Backbone.View.extend({
 
     this.blocksLoaded_ = false;
 
-    this.labels_ = {};
     this.labelColors_ = {};
     this.apiKey_ = this.options.api_key;
     console.log(this.options);
@@ -167,13 +156,6 @@ var MapPage = Backbone.View.extend({
 			onEachFeature: _.bind(this.onEachNeighborhoodFeature, this)
 		}).addTo(this.map_);
     this.neighborhoodLayer_.fire('data:loading');
-
-    $.ajax({
-      dataType: 'json',
-      url: '/api/labels?callback=?',
-      data: { areaid: this.options.areaid },
-      success: _.bind(this.storeLabels, this)
-    })
 
     if (this.options.geojson) {
       this.renderData(this.options.geojson);
@@ -310,7 +292,7 @@ var MapPage = Backbone.View.extend({
       this.colorNeighborhoodFeature(this.lastHighlightedNeighborhood_.feature, this.lastHighlightedNeighborhood_.layer);
       var hoodId = this.lastHighlightedNeighborhood_.feature['properties']['id']
       var voteString = _.map(this.clickedBlocks_, function(feature) {
-        if (!feature.properties.id) {
+        if (!feature.properties.hoodId) {
           return feature.properties.id + ',' + hoodId + ',-1';
         } else {
           return feature.properties.id + ',' + hoodId + ',1';
@@ -416,7 +398,7 @@ var MapPage = Backbone.View.extend({
 
   toggleBlockVoteHelper: function(layer, force, mode) {
     var hoodId = this.lastHighlightedNeighborhood_.feature['properties']['id']
-    var id = layer.feature.hoodId;
+    var id = layer.feature.properties.hoodId;
     this.clickedBlocks_.push(layer.feature);
     if (!layer.feature.properties.originalHoodId) {
       layer.feature.properties.originalHoodId = layer.feature.properties.hoodId;
@@ -499,8 +481,7 @@ var MapPage = Backbone.View.extend({
     if (this.apiKey_) {
       this.enterBlockMode();
     } else {
-      var modalEl = $('#loginModal')
-      modalEl.modal();
+      $('.loginAlert').show();
     }
  
     L.DomEvent.stopPropagation(e);

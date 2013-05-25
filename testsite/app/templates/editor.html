@@ -10,17 +10,18 @@
           <div class="alert alert-info" id="spinner">Loading ... (sorry, this takes a while to render)</div>
         </div>
       </div>
+      <span class="loginAlert alert" href="#">If you want to edit the map, please <a style=href="/login">login</a> <a class="close" data-dismiss="alert" href="#">&times;</a> </span>
+
       <div class="controls neighborhoodMode loading">
         <div class="neighborhoodControls nohover">
           {%- if current_user.is_authenticated() -%}
-
             <span class="titleHelp nohover">Click on a neighborhood to edit its boundary</span>
             <span class="downloadLink nohover"><a href="http://zetashapes.com/api/neighborhoodsByArea?areaid{{ areaid }}=&key={{current_user.api_key }}&intent=download">download</a></span>
             <span class="titleHelp hover">Click to edit:</span> <span class="neighborhoodInfo hover"></span>
             <!--'Polygon mode': <button type="button" id="polygonMode" class="btn btn-primary" data-loading-text="Off" data-toggle="button">On</button>-->
           {%- else -%}
              <span class="neighborhoodInfo hover"></span>
-             <span class="loginText">If you want to edit the map, please <a href="/login">login</a></span>
+            <span class="downloadLink nohover"><a href="http://zetashapes.com/api/neighborhoodsByArea?areaid{{ areaid }}=&key={{current_user.api_key }}&intent=download">download</a></span>
           {%- endif -%}
         </div>
 

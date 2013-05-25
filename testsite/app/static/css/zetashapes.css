@@ -25,6 +25,14 @@
   display: none;
 }
 
+.loginAlert {
+  position: fixed;
+  top: 20%;
+  left: 50%;
+  z-index: 200000;
+  display: none;
+}
+
 .controls {
 position: fixed;
 top: 47px;
