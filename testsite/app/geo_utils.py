@@ -83,6 +83,7 @@ def getNeighborhoodsByArea(conn, areaid, user):
   for block in blocks:
     geom = asShape(eval(block['geojson_geom']))
     votes = allVotes[block['geoid10']]
+    print block['geoid10']
     maxVote = vote_utils.pickBestVote(votes)
     if maxVote:
       blocks_by_hoodid[maxVote['id']].append(geom)

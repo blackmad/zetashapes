@@ -109,6 +109,7 @@ var MapPage = Backbone.View.extend({
       this.idToLayerMap_[feature.properties.id] = layer;
       this.idToFeatureMap_[feature.properties.id] = feature;
       var mouseOverCb = function(e) {
+        // console.log(feature.properties.id);
         layer.feature = feature;
         if (this.drawMode_ == 'continuous') {
           this.doVoteOnBlockLayer(layer);
@@ -179,11 +180,7 @@ var MapPage = Backbone.View.extend({
     console.log('fetching ' + areaid)
     $.ajax({
       dataType: 'json',
-      url: '/api/areaInfo?callback=?',
-      data: {
-        areaid: areaid,
-        key: this.apiKey_,
-      },
+      url: '/static/json/info-' + areaid + '.json',
       success: _.bind(this.renderAreaInfo, this)
     })
 
@@ -433,7 +430,7 @@ var MapPage = Backbone.View.extend({
   },
   
   processBlockClick: function(layer, e) { 
-    if (e.originalEvent.ctrlKey) {
+    if (e.originalEvent.altKey || e.originalEvent.metaKey) {
       if (!this.inPolygonMode_) {
         this.currentPaintLine_ = new L.Polygon([cloneLatLng(e.latlng), cloneLatLng(e.latlng)]);
         this.map_.addLayer(this.currentPaintLine_);
@@ -453,7 +450,7 @@ var MapPage = Backbone.View.extend({
   }, 
 
   processPolygonClick: function(e) { 
-    if (e.originalEvent.ctrlKey) {
+    if (e.originalEvent.altKey || e.originalEvent.metaKey) {
       this.processPolygonDoubleClick(e);
     } else if (this.inPolygonMode()) {
       console.log('in paint mode')
@@ -500,6 +497,9 @@ var MapPage = Backbone.View.extend({
   },
 
   colorBlockHelper: function(layer, inverted, opacity, setCursor) {
+    if (! this.lastHighlightedNeighborhood_) {
+      return;
+    }
     var hoodId = this.lastHighlightedNeighborhood_.feature['properties']['id'];
     var id = layer.feature.properties.hoodId;
     var color = this.calculateColor(this.lastHighlightedNeighborhood_.feature);
