@@ -81,8 +81,20 @@ def getVotes(conn, areaid, user):
     userId = user['id']
     cur.execute("""select g.woe_id, blockid, name, weight FROM user_votes v JOIN geoplanet_places g ON v.woe_id = g.woe_id WHERE v.userid = %s AND v.blockid LIKE '%s%%' ORDER BY g.woe_id, ts ASC""" % (userId, areaid))
     dedupedRows = {}
+
+    # take your first positive vote, unless you have a negative vote that comes after it that invalidates that
     for r in cur.fetchall():
-      dedupedRows[r['blockid']] = r
+      if r['blockid'] in dedupedRows:
+        if (
+          dedupedRows[r['blockid']]['weight'] == 1 and
+          dedupedRows[r['blockid']]['woe_id'] == r['woe_id'] and
+          r['weight'] == -1
+        ): 
+          dedupedRows[r['blockid']] = r
+        if r['weight'] == 1:
+          dedupedRows[r['blockid']] = r
+      else:
+        dedupedRows[r['blockid']] = r
 
     for r in dedupedRows.values():
       votes[r['blockid']].append({

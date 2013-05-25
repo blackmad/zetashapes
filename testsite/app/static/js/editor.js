@@ -95,6 +95,36 @@ var MapPage = Backbone.View.extend({
     }
   },
 
+  onEachBlockFeature: function(feature, layer) {
+    this.idToLayerMap_[feature.properties.id] = layer;
+    this.idToFeatureMap_[feature.properties.id] = feature;
+    var mouseOverCb = function(e) {
+      if (!this.inBlockMode_) {
+        return;
+      }
+
+      this.debugLog(feature.properties.id);
+      layer.feature = feature;
+      if (this.drawMode_ == 'continuous') {
+        this.doVoteOnBlockLayer(layer);
+      }
+      this.highlightBlock(layer, 0.75);
+    }
+
+    var mouseOutCb = function(e) {
+      if (!this.inBlockMode_) {
+        return;
+      }
+      layer.feature = feature
+      this.colorBlock(layer);
+    }
+
+    layer.feature = feature;
+    layer.on('mouseover', _.bind(mouseOverCb, this));
+    layer.on('mouseout', _.bind(mouseOutCb, this))
+    layer.on('click', _.bind(this.processBlockClick, this, layer))
+  },
+
   initialize: function() {
     this.debug_ = false;
     key('c', _.bind(function(){ this.toggleDrawMode('continuous', 'polygon') }, this));
@@ -111,32 +141,9 @@ var MapPage = Backbone.View.extend({
     this.inPolygonMode_ = false;
     this.$selectedNeighborhoodSpan = $('#selectedNeighborhood');
     this.neighborhoodIdToLayerMap_ = {};
-
-    function onEachFeature(feature, layer) {
-      this.idToLayerMap_[feature.properties.id] = layer;
-      this.idToFeatureMap_[feature.properties.id] = feature;
-      var mouseOverCb = function(e) {
-        this.debugLog(feature.properties.id);
-        layer.feature = feature;
-        if (this.drawMode_ == 'continuous') {
-          this.doVoteOnBlockLayer(layer);
-        }
-        this.highlightBlock(layer, 0.75);
-      }
-
-      var mouseOutCb = function(e) {
-        layer.feature = feature
-        this.colorBlock(layer);
-      }
-
-      layer.feature = feature;
-      layer.on('mouseover', _.bind(mouseOverCb, this));
-      layer.on('mouseout', _.bind(mouseOutCb, this))
-      layer.on('click', _.bind(this.processBlockClick, this, layer))
-    }
-
+ 
     this.blockLayer_ = L.geoJson(null, {
-			onEachFeature: _.bind(onEachFeature, this)
+			onEachFeature: _.bind(this.onEachBlockFeature, this)
 		});     
 
     this.blocksLoaded_ = false;
@@ -437,6 +444,10 @@ var MapPage = Backbone.View.extend({
   },
   
   processBlockClick: function(layer, e) { 
+    if (!this.inBlockMode_) {
+      return;
+    }
+
     if (e.originalEvent.altKey || e.originalEvent.metaKey) {
       if (!this.inPolygonMode_) {
         this.currentPaintLine_ = new L.Polygon([cloneLatLng(e.latlng), cloneLatLng(e.latlng)]);
