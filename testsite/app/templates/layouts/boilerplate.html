@@ -9,6 +9,7 @@
   <title>The Neighborhoods Project {{ page_title }}</title>
   <meta name="description" content="A working example of the Flask-Social extension for Flask, a web microframework written in Python">
   <meta name="viewport" content="width=device-width">
+  <link href="/static/css/keys.css" rel="stylesheet" media="screen">
   <link href="/static/css/bootstrap.css" rel="stylesheet" media="screen">
   <link href="/static/css/bootstrap.map.css" rel="stylesheet" media="screen">
   <link href="/static/css/bootstrap-responsive.css" rel="stylesheet" media="screen">
@@ -25,6 +26,7 @@
   <script src="/static/js/backbone.js"></script>
   <script src="/static/js/leaflet.spin.js"></script>
   <script src="/static/js/backbone.js"></script>
+  <script src="/static/js/keymaster.min.js"></script>
 
   <script src="/static/js/editor.js"></script>
 
@@ -56,7 +58,7 @@
     {% include "_messages.html" -%}
     {% block layout %}{% endblock -%}
     <footer class="footer">
-      <p>This site uses <a href="http://twitter.github.com/bootstrap/">Twitter Bootstrap</a>, leaflet, tiger data, flask. You can also <a href="https://github.com/blackmad/the-neighborhoods-project">view the source code.</a></p>
+      <p>Maintained by <a href="http://twitter.com/blackmad">@blackmad</a>, This site uses data from <a href="http://flickr.com">flickr</a>. <a href="https://github.com/blackmad/the-neighborhoods-project">Source code.</a> <a href="mailto:zetashapes@davidblackman.com">Email me.</a></p>
     </footer>
   </div>
 </body>

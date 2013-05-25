@@ -253,18 +253,7 @@ def do_vote():
         #print vote
         #print existing_vote['woe_id']
         #print vote.weight
-        try:
-          modifyUsersVoteCount(cur, user['level'], vote.blockid, existing_vote['woe_id'], -1*vote.weight)
-        except Exception as inst:
-          print 'existing vote: %s' % existing_vote
-          print 'vote'
-          print vote
-          raise inst
-        print cur.mogrify("""DELETE FROM user_votes WHERE userid=%s AND blockid=%s AND woe_id=%s""", (
-          userId, vote.blockid, existing_vote['woe_id']))
-
-        cur.execute("""DELETE FROM user_votes WHERE userid=%s AND blockid=%s AND woe_id=%s""", (
-          userId, vote.blockid, existing_vote['woe_id']))
+        modifyUsersVoteCount(cur, user['level'], vote.blockid, existing_vote['woe_id'], -1*vote.weight)
 
     if not already_had_vote:
       cur.execute("""select COUNT(*) as c FROM votes WHERE source='users' AND id=%s AND label=%s""", (
@@ -280,7 +269,7 @@ def do_vote():
     
       cur.execute("""INSERT INTO user_votes (userid, blockid, woe_id, weight, ts) values (%s, %s, %s, %s, 'now')""", (
         userId, vote.blockid, vote.woe_id, vote.weight))
-      conn.commit()
+    conn.commit()
         
     # see if I have an existing vote on user_votes for this block
     # if I do, and it's for the same woe_id, don't do anything

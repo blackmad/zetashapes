@@ -2,6 +2,13 @@
   float: left
 }
 
+.loginText {
+  float:right;
+}
+
+.downloadLink {
+  float:right;
+}
 
 .neighborhoodInfo {
   float: left
@@ -48,3 +55,5 @@ box-shadow: 1px 2px 6px rgba(0, 0, 0, 0.5);
 
 .neighborhoodControls.nohover .hover {display:none}
 .neighborhoodControls.hover .nohover {display:none}
+
+.controls.loading {display:none}

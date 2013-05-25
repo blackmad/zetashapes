@@ -125,6 +125,9 @@ def admin():
     users = User.query.all()
     return render_template('admin.html', users=users)
 
+@app.route('/license')
+def license():
+    return render_template('license.html')
 
 @app.route('/admin/users/<user_id>', methods=['DELETE'])
 @requires_auth

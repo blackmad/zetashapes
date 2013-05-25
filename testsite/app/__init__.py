@@ -10,7 +10,15 @@ from .helpers import Flask
 from .middleware import MethodRewriteMiddleware
 import os
 import flask_gzip
+import flask_social.providers.foursquare
+import foursquare
 
+def get_provider_user_id(response, **kwargs):
+  if response:
+    api = foursquare.Foursquare(access_token=response['access_token'])
+    return api.users()['user']['id']                              
+  return None
+flask_social.providers.foursquare.get_provider_user_id = get_provider_user_id
 
 app = Flask(__name__)
 app.config.from_yaml(app.root_path)

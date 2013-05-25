@@ -37,8 +37,23 @@
   </div>
   <div class="row">
     <div class="span10 offset1">
-      <p>Flask-Social is an extension for the wonderful Python web framework, <a href="http://flask.pocoo.org">Flask</a>. It aims to add simple OAuth provider integration to your application. It is dependent on the <a href="http://packages.python.org/Flask-Security">Flask-Security</a> extension which provides simple user management. This website serves as an example of how to use both extensions effectively.</p>
-      <p>Essentially, Flask-Social sets up endpoints for your app to make it easy for you to let your users connect and/or login using Facebook and Twitter. Flask-Social persists the connection information and allows you to get a configured instance of an API object with your user’s token so you can make API calls on behalf of them. Currently Facebook and Twitter are supported out of the box as long as you install the appropriate API library.</p>
+      <p>The neighborhodo project / zetashapes is an experiment in crowdsourced US neighborhood polygons. From here, you can download neighborhood boundaries for every city in the US derived from geotags on flickr photos. You can also edit these boundaries and download custom <a href="http://geojson.org">GeoJSON</a> with your edits applied. Your edits will also be contributed back into improving the overall boundaries.</p>
+
+      <p>still todo
+      <ul>
+        <li>generate a nationwide file for download
+        <li>allow adding new neighborhoods
+        <li>possibly add a draw-from-scratch mode
+        <li>highlight orphaned blocks
+        <li>figure out how to balance user vs derived labels
+        <li>deal with overlapping/sub/macro neighborhoods
+        <li>reattach brooklyn piers to brooklyn (they belong to manhattan county) -- please send me other examples of this.
+      </ul>
+      </p>
+      
+      <p>
+        <img src="/static/img/demo-nyc.png"/>
+      </p>
     </div>
   </div>
 {% endblock %}

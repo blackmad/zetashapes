@@ -7,17 +7,20 @@
       <div class="row-fluid">
         <div class="span12">
           <div id="map"></div>
-          <img src="/static/img/spinner.gif" id="spinner"/>
+          <div class="alert alert-info" id="spinner">Loading ... (sorry, this takes a while to render)</div>
         </div>
       </div>
-      <div class="controls neighborhoodMode">
+      <div class="controls neighborhoodMode loading">
         <div class="neighborhoodControls nohover">
           {%- if current_user.is_authenticated() -%}
+
             <span class="titleHelp nohover">Click on a neighborhood to edit its boundary</span>
+            <span class="downloadLink nohover"><a href="http://zetashapes.com/api/neighborhoodsByArea?areaid{{ areaid }}=&key={{current_user.api_key }}&intent=download">download</a></span>
             <span class="titleHelp hover">Click to edit:</span> <span class="neighborhoodInfo hover"></span>
             <!--'Polygon mode': <button type="button" id="polygonMode" class="btn btn-primary" data-loading-text="Off" data-toggle="button">On</button>-->
           {%- else -%}
-             If you want to edit the map, please <a href="/login">login</a>
+             <span class="neighborhoodInfo hover"></span>
+             <span class="loginText">If you want to edit the map, please <a href="/login">login</a></span>
           {%- endif -%}
         </div>
 
@@ -26,7 +29,9 @@
           <button type="button" class="exitAndSaveBlockModeButton" class="btn btn-primary">Save Edits</button>
           <button type="button" class="exitAndUndoBlockModeButton" class="btn btn-primary">Exit and Undo Edits</button>
           <a href="#" data-toggle="tooltip" title="instructions" class="helpButton">Editing Instructions</a>
+          <span class="polygonModeAction"></span> <span class="drawMode"></span> mode
         </div>
+
       </div>
     </div>
 
@@ -40,9 +45,13 @@
           <hr/>
           Removed blocks will remain unlabeled until you edit a different neighborhood and attach them there.
           <hr/>
-          To make a bigger addition, shift-click to begin drawing a polygon, doubleclick or shift-click to end it.
+          To make a bigger addition, shift-click to begin drawing a polygon, and shift-click to end it. <br/>
+          By default, the selection will be added to the existing neighborhood, this can be changed with
+          <span class="light-keys"><kbd>r</kbd> for redraw mode, and <kbd>d</kbd> for delete mode, and <kbd>a</kbd> to get back to add.</span>
           <hr/>
-
+          Another option is to turn on continuous mode with 
+          <span class="light-keys"><kbd>c</kbd>. Once this is enabled, all blocks moused over will be added (or deleted depending on the mode), hit <kbd>c</kbd> again to go back to polygon mode.</span>
+          <hr/>
           (delete neighborhood coming soon)
   </div>
 </div>

@@ -74,7 +74,7 @@ def getVotes(conn, areaid, user):
   print user
   if user:
     userId = user['id']
-    cur.execute("""select g.woe_id, blockid, name, weight FROM user_votes v JOIN geoplanet_places g ON v.woe_id = g.woe_id WHERE v.userid = %s AND v.blockid LIKE '%s%%'""" % (userId, areaid))
+    cur.execute("""select DISTINCT ON (g.woe_id) g.woe_id, blockid, name, weight FROM user_votes v JOIN geoplanet_places g ON v.woe_id = g.woe_id WHERE v.userid = %s AND v.blockid LIKE '%s%%' ORDER BY g.woe_id, ts DESC""" % (userId, areaid))
     for r in cur.fetchall():
       votes[r['blockid']].append({
         'label': r['name'], 
