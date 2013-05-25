@@ -179,9 +179,6 @@ def findUserByApiKey(api_key):
 
 def modifyUsersVoteCount(cur, userLevel, blockid, woeid, incr):
   conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
-  print cur.mogrify("""update votes SET count = count + %s WHERE label=%s AND id=%s""", (
-    incr, woeid, blockid
-  ))
 
   cur.execute("""update votes SET count = count + %s WHERE label=%s AND id=%s""", (
     incr, woeid, blockid
@@ -231,7 +228,7 @@ def do_vote():
     userId,
     tuple([v[0] for v in votepairs])
   ))
-  print comm
+  #print comm
   cur.execute(comm)
 
   rows = cur.fetchall()
@@ -242,21 +239,21 @@ def do_vote():
   #print existing_votes
 
   for vote in votepairs:
-    print 'looking at label vote %s for block %s' % (vote.woe_id, vote.blockid)
-    print existing_votes[vote.blockid]
+    #print 'looking at label vote %s for block %s' % (vote.woe_id, vote.blockid)
+    #print existing_votes[vote.blockid]
 
     already_had_vote = False
     for existing_vote in existing_votes[vote.blockid]:
-      print 'existing vote %s' % existing_vote
+      #print 'existing vote %s' % existing_vote
       if existing_vote['woe_id'] == vote.woe_id and existing_vote['weight'] == vote.weight:
         already_had_vote = True
-        print 'matched'
+        #print 'matched'
       else:
-        print 'didnot match'
-        print existing_vote
-        print vote
-        print existing_vote['woe_id']
-        print vote.weight
+        #print 'didnot match'
+        #print existing_vote
+        #print vote
+        #print existing_vote['woe_id']
+        #print vote.weight
         modifyUsersVoteCount(cur, user['level'], vote.blockid, existing_vote['woe_id'], -1*vote.weight)
 
     if not already_had_vote:
@@ -267,7 +264,7 @@ def do_vote():
         # we have an existing row to increment
         modifyUsersVoteCount(cur, user['level'], vote.blockid, vote.woe_id, vote.weight)
       else:
-        print 'trying to insert'
+        #print 'trying to insert'
         cur.execute("""INSERT INTO votes (id, label, count, source) values (%s, %s, %s, 'users')""", (
           vote.blockid, vote.woe_id, vote.weight))
     

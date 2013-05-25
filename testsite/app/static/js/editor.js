@@ -10,6 +10,12 @@ function cloneLatLng(ll) {
 };
 
 var MapPage = Backbone.View.extend({
+  debugLog: function(s) {
+    if (this.debug_) {
+      console.log(s);
+    }
+  },
+
   recolorBlocks: function(blocks) {
     _.each(blocks, _.bind(function(block) {
       this.colorBlock(block, 1.0);
@@ -17,9 +23,9 @@ var MapPage = Backbone.View.extend({
   },
 
   unhighlightPolygon: function() {
-    console.log('unhighlighting');
+    this.debugLog('unhighlighting');
     if (this.currentPaintLine_) {
-      console.log('doing stuff');
+      this.debugLog('doing stuff');
       this.map_.removeLayer(this.currentPaintLine_);
       this.lastHighlightedBlocks_ = [];
       this.togglePolygonMode();
@@ -60,7 +66,7 @@ var MapPage = Backbone.View.extend({
   },
 
   recolorNeighborhoods: function() {
-    console.log(this.neighborhoodIdToLayerMap_);
+    this.debugLog(this.neighborhoodIdToLayerMap_);
     _.each(this.neighborhoodIdToLayerMap_, _.bind(function(layer, id, list) {
       this.colorNeighborhoodFeature(layer.feature, layer); 
     }, this));
@@ -90,6 +96,7 @@ var MapPage = Backbone.View.extend({
   },
 
   initialize: function() {
+    this.debug_ = false;
     key('c', _.bind(function(){ this.toggleDrawMode('continuous', 'polygon') }, this));
     key('p', _.bind(function(){ this.toggleDrawMode('polygon', 'continous') }, this));
     key('r', _.bind(function(){ this.changePolygonMode('redraw') }, this));
@@ -109,7 +116,7 @@ var MapPage = Backbone.View.extend({
       this.idToLayerMap_[feature.properties.id] = layer;
       this.idToFeatureMap_[feature.properties.id] = feature;
       var mouseOverCb = function(e) {
-        // console.log(feature.properties.id);
+        this.debugLog(feature.properties.id);
         layer.feature = feature;
         if (this.drawMode_ == 'continuous') {
           this.doVoteOnBlockLayer(layer);
@@ -136,7 +143,7 @@ var MapPage = Backbone.View.extend({
 
     this.labelColors_ = {};
     this.apiKey_ = this.options.api_key;
-    console.log(this.options);
+    this.debugLog(this.options);
 
     this.map_= L.map('map', {dragging: true}).setView([40.74, -74], 13);
     var mapboxTilesAttr = 'Tiles &copy; <a href="http://www.mapbox.com/about/maps/">Mapbox</a>, Data &copy; OSM';
@@ -170,14 +177,14 @@ var MapPage = Backbone.View.extend({
   },
 
   renderAreaInfo: function(data) {
-    console.log('made it to areainfo')
-    console.log(data)
+    this.debugLog('made it to areainfo')
+    this.debugLog(data)
     this.map_.fitBounds(L.geoJson(data.areas[0].bbox).getBounds());
     this.centered = true;
   },
 
   fetchData: function(areaid) {
-    console.log('fetching ' + areaid)
+    this.debugLog('fetching ' + areaid)
     $.ajax({
       dataType: 'json',
       url: '/static/json/info-' + areaid + '.json',
@@ -237,7 +244,7 @@ var MapPage = Backbone.View.extend({
   },
 
   highlightBlocks: function(blockIdsResponse, opacity) {
-    console.log('opacity? ' + opacity);
+    this.debugLog('opacity? ' + opacity);
     opacity = opacity || 0.2;
     this.recolorBlocks(this.lastHighlightedBlocks_);
 
@@ -255,7 +262,7 @@ var MapPage = Backbone.View.extend({
 
   highlightBlocksByGeometry: function(latlngs) {
     var lls = _.map(latlngs.concat([latlngs[0]]), function(ll) { return ll.lng + ' ' + ll.lat }).join(',')
-    console.log('firing off highlight blocks')
+    this.debugLog('firing off highlight blocks')
     $.ajax({
       dataType: 'json',
       url: '/api/blocksByGeom?callback=?',
@@ -266,10 +273,10 @@ var MapPage = Backbone.View.extend({
   },
 
   processPolygonDoubleClick: function(e) { 
-    console.log('dblclick')
-    console.log(e)
+    this.debugLog('dblclick')
+    this.debugLog(e)
     if (this.inPolygonMode()) {
-      console.log('in paint mode, trying to stop being in it')
+      this.debugLog('in paint mode, trying to stop being in it')
       if (this.currentPaintLine_) {
         this.highlightBlocksByGeometry(this.currentPaintLine_.getLatLngs());
         this.unhighlightPolygon();
@@ -333,7 +340,7 @@ var MapPage = Backbone.View.extend({
     this.clickedBlocks_ = [];
     // swap in the block layer
     this.map_.fitBounds(this.lastHighlightedNeighborhood_.layer.getBounds());
-    console.log(this.lastHighlightedNeighborhood_.feature['properties']);
+    this.debugLog(this.lastHighlightedNeighborhood_.feature['properties']);
     var hoodId = this.lastHighlightedNeighborhood_.feature['properties']['id']
     this.blockLayer_.setStyle(this.lightStyle);
 
@@ -357,7 +364,7 @@ var MapPage = Backbone.View.extend({
       this.reallyEnterBlockMode();
     } else {
       this.blockLoader_.once('loaded', _.bind(function() {
-        console.log('should hide spinner');
+        this.debugLog('should hide spinner');
         this.reallyEnterBlockMode();
       }, this));
     }
@@ -402,10 +409,10 @@ var MapPage = Backbone.View.extend({
     }
 
     if ((!force && id != hoodId) || (force && mode != 'delete')) {
-      console.log('adding vote')
+      this.debugLog('adding vote')
       layer.feature.properties.hoodId = hoodId;
     } else {
-      console.log('removing vote')
+      this.debugLog('removing vote')
       layer.feature.properties.hoodId = null;
     }
   
@@ -441,7 +448,7 @@ var MapPage = Backbone.View.extend({
       this.lastHighlightedBlocks_ = [];
 
       this.togglePolygonMode();
-      console.log('toggling polygon mode: we are now in polygon mode?' + this.inPolygonMode_);
+      this.debugLog('toggling polygon mode: we are now in polygon mode?' + this.inPolygonMode_);
     } else {
       if (this.drawMode_ != 'continuous') {
         this.toggleBlockVote(layer);
@@ -453,11 +460,11 @@ var MapPage = Backbone.View.extend({
     if (e.originalEvent.altKey || e.originalEvent.metaKey) {
       this.processPolygonDoubleClick(e);
     } else if (this.inPolygonMode()) {
-      console.log('in paint mode')
-      console.log(this.currentPaintLine_);
+      this.debugLog('in paint mode')
+      this.debugLog(this.currentPaintLine_);
       if (this.currentPaintLine_) {
         var lastIndex = this.currentPaintLine_.getLatLngs().length - 1
-        console.log(this.currentPaintLine_.getLatLngs()[0].distanceTo(e.latlng));
+        this.debugLog(this.currentPaintLine_.getLatLngs()[0].distanceTo(e.latlng));
         this.highlightBlocksByGeometry(this.currentPaintLine_.getLatLngs())
         if (this.currentPaintLine_.getLatLngs()[0].distanceTo(e.latlng) < 100) {
           this.currentPaintLine_ = null;
@@ -473,8 +480,8 @@ var MapPage = Backbone.View.extend({
   },
 
   processNeighborhoodClick: function(e) { 
-    console.log('click')
-    console.log(e);
+    this.debugLog('click')
+    this.debugLog(e);
     if (this.apiKey_) {
       this.enterBlockMode();
     } else {
@@ -530,7 +537,7 @@ var MapPage = Backbone.View.extend({
   cacheBlockData: function(geojson) { 
     this.updateStatus('loaded census blocks')
 
-    console.log('loaded block layer');
+    this.debugLog('loaded block layer');
     this.blocksLoaded_ = true;
     this.blockLayer_.addData(geojson)
     this.updateStatus('built block layer');
@@ -553,7 +560,7 @@ var MapPage = Backbone.View.extend({
       layer.feature = feature;
       this.neighborhoodIdToLayerMap_[feature.properties.id] = layer;
       if (!this.centered) {
-        window.console.log(feature);
+        window.this.debugLog(feature);
         if (feature.geometry.type == "Polygon") {
           this.map_.panTo(new L.LatLng(feature.geometry.coordinates[0][0][1], feature.geometry.coordinates[0][0][0]));
         } else {
@@ -573,7 +580,7 @@ var MapPage = Backbone.View.extend({
           'layer': layer,
           'feature': feature
         }
-        console.log(feature['properties']['id'] + ' mouse over ' + this.calculateColor(feature));
+        this.debugLog(feature['properties']['id'] + ' mouse over ' + this.calculateColor(feature));
 
         $('.neighborhoodInfo').html(
           feature.properties.label
@@ -583,7 +590,7 @@ var MapPage = Backbone.View.extend({
       var mouseOutCb = function(e) {
         $('.neighborhoodControls').addClass('nohover');
         $('.neighborhoodControls').removeClass('hover');
-        console.log(feature['properties']['id'] + ' mouse out');
+        this.debugLog(feature['properties']['id'] + ' mouse out');
         this.colorNeighborhoodFeature(feature, layer);
       }
 
@@ -592,7 +599,7 @@ var MapPage = Backbone.View.extend({
 
   labelBlocks: function() {
     this.updateStatus('matching neighborhood labels to blocks');
-    console.log('labeling blocks');
+    this.debugLog('labeling blocks');
     _.each(this.neighborhoodGeoJson_.features, _.bind(function(f) {
       var me = this;
       _.each(f.properties.blockids, function(bid) {
@@ -600,7 +607,7 @@ var MapPage = Backbone.View.extend({
         if (block) {
           block.properties['hoodId'] = f.properties.id;
         } else {
-          console.log('no block for ' + bid);
+          this.debugLog('no block for ' + bid);
         }
       })
     }, this));
@@ -608,7 +615,7 @@ var MapPage = Backbone.View.extend({
 
   requestDone: function() {
     this.requestsOutstanding_--;
-    console.log(this.requestsOutstanding_)
+    this.debugLog(this.requestsOutstanding_)
     if (this.requestsOutstanding_ == 0) {
       this.neighborhoodLayer_.fire('data:loaded');
       $('.controls').toggleClass('loading loaded');
@@ -634,19 +641,19 @@ var MapPage = Backbone.View.extend({
     this.map_.fitBounds(this.neighborhoodLayer_.getBounds());
      
     this.map_.on('mousemove', _.bind(function(e) {
-        // console.log(e)
+        // this.debugLog(e)
         if (this.inPolygonMode()) {
-          console.log('moving in poly mode');
+          this.debugLog('moving in poly mode');
           if (this.currentPaintLine_) {
-            console.log('moving in poly mode with a paint line');
+            this.debugLog('moving in poly mode with a paint line');
             var lastIndex = this.currentPaintLine_.getLatLngs().length - 1;
             if (lastIndex == 0) {
               lastIndex = 1;
             }
             
-            console.log(this.currentPaintLine_.getLatLngs())
+            this.debugLog(this.currentPaintLine_.getLatLngs())
             this.currentPaintLine_.spliceLatLngs(lastIndex, 1, cloneLatLng(e.latlng));
-            console.log(this.currentPaintLine_.getLatLngs())
+            this.debugLog(this.currentPaintLine_.getLatLngs())
           }
         } 
       }, this));
