@@ -16,8 +16,9 @@ from shapely.ops import cascaded_union
 from shapely.geometry import mapping, asShape
 from shapely import speedups
 
-def pickBestVote(votes, preferSmear=True):
+def pickBestVote(votes, preferSmear=True, preferOfficial=True):
   maxVote = None
+
   selfVotes = [v for v in votes if v['source'] == 'self']
   positiveSelfVotes = None
   if len(selfVotes) > 0:
@@ -32,6 +33,10 @@ def pickBestVote(votes, preferSmear=True):
       print votes
   if not maxVote and len(votes) > 0:
     maxVote = max(votes, key=lambda x:x['count'])
+  
+  officialVotes = [v for v in votes if v['source'].startswith('official')]
+  if preferOfficial and officialVotes and not positiveSelfVotes:
+    return officialVotes[0]
 
   blockrVotes = [v for v in votes if v['source'] == 'blockr']
   if preferSmear and blockrVotes and not positiveSelfVotes:

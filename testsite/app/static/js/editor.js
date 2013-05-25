@@ -451,7 +451,7 @@ var MapPage = Backbone.View.extend({
   },
   
   processBlockClick: function(layer, e) { 
-    if (e.originalEvent.shiftKey) {
+    if (e.originalEvent.ctrlKey) {
       if (!this.inPolygonMode_) {
         this.currentPaintLine_ = new L.Polygon([cloneLatLng(e.latlng), cloneLatLng(e.latlng)]);
         this.map_.addLayer(this.currentPaintLine_);
@@ -471,7 +471,7 @@ var MapPage = Backbone.View.extend({
   }, 
 
   processPolygonClick: function(e) { 
-    if (e.originalEvent.shiftKey) {
+    if (e.originalEvent.ctrlKey) {
       this.processPolygonDoubleClick(e);
     } else if (this.inPolygonMode()) {
       console.log('in paint mode')
@@ -559,7 +559,7 @@ var MapPage = Backbone.View.extend({
     this.updateStatus('hiding block layer until later');
 
     this.blockLoader_.trigger('loaded');
-    this.map_.boxZoom.disable();
+    // this.map_.boxZoom.disable();
     if (this.neighborhoodsLoaded_) {
       this.labelBlocks();
     }
