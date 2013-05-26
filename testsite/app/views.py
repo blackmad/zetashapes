@@ -21,7 +21,7 @@ import pygeoip
 gi = pygeoip.GeoIP('app/data/GeoLiteCity.dat', pygeoip.MEMORY_CACHE)
 
 import psycopg2
-conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
+psycopg2 = pool.manage(psycopg2)
 
 
 @app.route('/api/test')
@@ -30,6 +30,7 @@ def test():
 
 @app.route('/')
 def index():
+    conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
     print request.remote_addr
     areas = []
     if request.access_route:
@@ -116,6 +117,7 @@ def register(provider_id=None):
 @app.route('/profile')
 @login_required
 def profile():
+    conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
     areaids = vote_utils.getAreaIdsForUserId(conn, current_user.id)
     areas = geo_utils.getInfoForAreaIds(conn, areaids)
     return render_template('profile.html',

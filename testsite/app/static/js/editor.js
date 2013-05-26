@@ -222,6 +222,8 @@ var MapPage = Backbone.View.extend({
         },
         success: _.bind(this.cacheBlockData, this)
       })
+   } else {
+    this.neighborhoodLayer_.on('click', _.bind(this.processNeighborhoodClick, this));
    }
   },
 
@@ -496,7 +498,13 @@ var MapPage = Backbone.View.extend({
     if (this.apiKey_) {
       this.enterBlockMode();
     } else {
-      $('.loginAlert').show();
+      if (this.loginAlert_) {
+        $('body').append(mapPage.loginAlert_)
+      } else {
+        this.loginAlert_ = $('.loginAlert').clone()
+        $('body').append(this.loginAlert_)
+        this.loginAlert_.show();
+      }
     }
  
     L.DomEvent.stopPropagation(e);

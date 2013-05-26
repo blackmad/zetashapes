@@ -123,7 +123,8 @@ def getNeighborhoodsByArea(areaid, user):
   
   intent = request.args.get('intent', None)
   if intent == 'download':
-    jresponse.headers[u"Content-Disposition"] = 'attachment; filename=%s.json' % areaid
+    jresponse.headers['Content-Disposition'] = 'attachment; filename=%s.json' % areaid
+  print jresponse
 
   return jresponse
 
@@ -172,10 +173,13 @@ def labels():
 
 # this should probably go through the user model? meh
 def findUserByApiKey(api_key):
-  conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
-  cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-  cur.execute("""select * FROM users WHERE api_key=%s""",  (api_key,))
-  return cur.fetchone()
+  if (api_key):
+    conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
+    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    cur.execute("""select * FROM users WHERE api_key=%s""",  (api_key,))
+    return cur.fetchone()
+  else:
+    return None
 
 def modifyUsersVoteCount(cur, userLevel, blockid, woeid, incr):
   conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
