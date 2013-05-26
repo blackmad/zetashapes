@@ -21,6 +21,7 @@ import pygeoip
 gi = pygeoip.GeoIP('app/data/GeoLiteCity.dat', pygeoip.MEMORY_CACHE)
 
 import psycopg2
+import sqlalchemy.pool as pool
 psycopg2 = pool.manage(psycopg2)
 
 
