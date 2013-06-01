@@ -1,9 +1,10 @@
 #!/usr/bin/python
 
-from shapely.geometry import Point, Polygon, MultiPolygon, asShape
+from shapely.geometry import Point, Polygon, MultiPolygon, asShape, LineString
 from shapely.ops import cascaded_union, polygonize
 import sys, json, math, pickle, os, geojson
 import fiona
+import json
 import geojson
 import traceback
 
@@ -13,22 +14,32 @@ lines = []
 for index, feature in enumerate(source):
     if index % 1000 == 0:
       print "processed %s of %s" % (index, len(source))
-    if feature['geometry']['type'] in ('LineString', 'MultiLineString'):
-      # should we check on these?
-      # EdgeRing::getRingInternal: IllegalArgumentException: Invalid number of points in LinearRing found 3 - must be 0 or >= 4
-      lines.append(asShape(feature['geometry']))
+    if feature['geometry']['type'] == 'LineString':
+      coords = feature['geometry']['coordinates']
+      for (start, end) in zip(coords[:-1], coords[1:]):
+        lines.append(LineString([start, end]))
+    if feature['geometry']['type'] == 'MultiLineString':
+      for coords in feature['geometry']['coordinates']:
+        for (start, end) in zip(coords[:-1], coords[1:]):
+          lines.append(LineString([start, end]))
+
 print >>sys.stderr, "%d lines read." % len(source)
-blocks = [poly.__geo_interface__ for poly in  polygonize(lines)]
-features = []
-for b in blocks:
+
+outputFile = open(sys.argv[1] + '.json', 'w')
+outputFile.write('{ "type": "FeatureCollection",   "features": [')
+for index, poly in enumerate(polygonize(lines)):
+  if index % 1000 == 0:
+    print "wrote %s blocks so far" % (index)
+
   try:
-    jsonGeom = geojson.dumps(b)
-    features.append(
-      geojson.Feature(geometry=jsonGeom, properties={})
-    )
+    jsonGeom = json.loads(geojson.dumps(poly.__geo_interface__))
+
+    if index != 0:
+      outputFile.write(',')
+    outputFile.write(json.dumps({'geometry': jsonGeom, 'properties': {}}))
   except:
     print b
     print traceback.print_exc()
-fc = geojson.FeatureCollection(features)
-geojson.dumps(fc, sys.argv[1] + '.json')
+outputFile.write(']}')
+outputFile.close()
 
