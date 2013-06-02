@@ -145,6 +145,24 @@ def areaInfo():
   areaInfos = geo_utils.getInfoForAreaIds(conn, areaid)
   return jsonify({'areas': areaInfos})
 
+@app.route('/api/blockInfo')
+@support_jsonp
+def blockInfo():
+  apikey = request.args.get('key', '')
+  user = findUserByApiKey(apikey)
+  conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
+  blockids = request.args.get('blockid', '').split(',')
+  voteDict = vote_utils.getVotesForBlocks(conn, blockids, user)
+
+  responseDict = {}
+  for (blockid, votes) in voteDict.iteritems():
+    responseDict[blockid] = {
+      'votes': votes,
+      'bestVote': vote_utils.pickBestVote(votes)
+    }
+  
+  return jsonify(responseDict)
+
 @app.route('/api/labels', methods=['GET'])
 @support_jsonp
 def labels():

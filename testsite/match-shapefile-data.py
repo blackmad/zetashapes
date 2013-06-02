@@ -3,6 +3,7 @@
 import fiona
 from shapely.geometry import asShape
 from shapely.geometry import mapping
+from collections import namedtuple
 import psycopg2
 import sys
 import itertools
@@ -62,13 +63,22 @@ def query_yes_no(question, default="yes"):
 conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
 cur = conn.cursor()
 
+def get_all_parents(woe_id):
+  parents = []
+  while 1 not in parents:
+    cur.execute("select parent_id FROM geoplanet_places WHERE woe_id = %s", (woe_id,))
+    rows = cur.fetchall()
+    parents.append(rows[0][0])
+    woe_id = rows[0][0]
+  return parents
+
 def find_place(name, placetype, parent=None):
   print 'looking for %s of %s in %s' % (name, placetype, parent)
   cur.execute("select woe_id, parent_id FROM geoplanet_places WHERE name = %s AND placetype = %s", (name, placetype))
   rows = cur.fetchall()
   print rows
   if parent:
-    rows = [r for r in rows if r[1] == parent]
+    rows = [r for r in rows if parent in get_all_parents(r[1])]
   if len(rows) > 1:
     print 'ambiguous!!!'
     print rows
@@ -89,6 +99,7 @@ filename = sys.argv[1]
 placeparts = sys.argv[2].split(',')
 colname = sys.argv[3]
 sourcename = sys.argv[4]
+areaids = sys.argv[5].split(',')
 
 parentid = None
 for i in range(0, len(placeparts), 2):
@@ -99,11 +110,6 @@ for i in range(0, len(placeparts), 2):
 def normalize(s):
   return s.lower().replace(' ', '').replace('-', '')
 
-def add_place(name):
-  cur.execute("insert into geoplanet_places values ((select max(woe_id) FROM geoplanet_places) +1, 'US', %s, 'en', 'Suburb', %s) RETURNING woe_id", (name, parentid))
-  conn.commit()
-  return cur.fetchone()[0]
-
 validids = find_children([parentid,])
 cur.execute("select name, woe_id FROM geoplanet_places WHERE woe_id IN %s AND placetype='Suburb'", (tuple(validids),))
 placeDict = {}
@@ -111,11 +117,22 @@ placeNameDict = {}
 for r in cur.fetchall():
   name = normalize(r[0])
   placeDict[name] = r[1]
-  placeNameDict[name] = r[0]
+  placeNameDict[r[1]] = name
 
 bestLabels = {}
 
+def add_place(name):
+  print 'adding place: %s' % name
+  cur.execute("insert into geoplanet_places values ((select max(woe_id) FROM geoplanet_places) +1, 'US', %s, 'en', 'Suburb', %s) RETURNING woe_id", (name, parentid))
+  conn.commit()
+  id = cur.fetchone()[0]
+  placeDict[name] = id
+  return id
+
+BlockOverlap = namedtuple('BlockOverlap', ['hoodid', 'overlap'])
+
 for f in fiona.open(filename, 'r'):
+  hoodid = None
   hoodname = normalize(f['properties'][colname])
   if hoodname not in placeDict:
     print f['properties'][colname]
@@ -126,21 +143,30 @@ for f in fiona.open(filename, 'r'):
           hoodid = placeDict[n]
         else:
           hoodid = add_place(f['properties'][colname])
-      else:
-        hoodid = add_place(f['properties'][colname])
+          break
+    if hoodid is None:
+      hoodid = add_place(f['properties'][colname])
   else:
     hoodid = placeDict[hoodname]
 
+  if not hoodid:
+    continue
+
   wkt = asShape(f['geometry']).wkt
-  cur.execute("""select geoid10, ST_Area(ST_Intersection(geom, ST_GeomFromText(%s, 4326))) / ST_Area(ST_GeomFromText(%s, 4326)) FROM tabblock10 tb WHERE ST_Intersects(geom, ST_Transform(ST_GeomFromText(%s, 4326), 4326)) AND blockce10 NOT LIKE '0%%'""", (wkt,wkt, wkt))
+  print "Examining %s %s: %s" % (hoodid, hoodname, wkt)
+  cur.execute("""select geoid10, ST_Area(ST_Intersection(geom, ST_GeomFromText(%s, 4326))) / ST_Area(geom) FROM tabblock10 tb WHERE ST_Intersects(geom, ST_Transform(ST_GeomFromText(%s, 4326), 4326)) AND blockce10 NOT LIKE '0%%'""", (wkt,wkt))
   for r in cur.fetchall():
     geoid = r[0]
     overlap = r[1]
-    if id not in bestLabels:
-      bestLabels[geoid] = (hoodid, overlap)
-    elif bestLabels[geoid] < overlap:
+    if overlap*100 < 10:
+      continue
+      
+    print "overlapping block %s %s%%" % (geoid, overlap*100)
+    if geoid not in bestLabels:
+      bestLabels[geoid] = BlockOverlap(hoodid, overlap)
+    elif bestLabels[geoid].overlap < overlap:
       print 'superceding %s for %s with %s' % (bestLabels[geoid], geoid, hoodid)
-      bestLabels[geoid] = (hoodid, overlap)
+      bestLabels[geoid] = BlockOverlap(hoodid, overlap)
 
 source = 'official-%s' % sourcename
 cur.execute("""DELETE FROM votes WHERE source = %s""", (source,))
@@ -148,4 +174,14 @@ cur.execute("""DELETE FROM votes WHERE source = %s""", (source,))
 for (geoid, hoodid) in bestLabels.items():
   cur.execute("""INSERT INTO votes (id, label, count, source) values (%s, %s, %s, %s)""", (
     geoid, hoodid[0], 1, source))
+
+for areaid in areaids:
+  statefp10 = areaid[0:2]
+  countyfp10 = areaid[2:]
+  cur.execute("""select geoid10 FROM tabblock10 tb WHERE statefp10 = %s AND countyfp10 = %s AND blockce10 NOT LIKE '0%%' AND geoid10 NOT IN %s""", (statefp10, countyfp10, tuple(bestLabels.keys())))
+  unlabeledBlockIds = [i[0] for i in cur.fetchall()]
+  for geoid in unlabeledBlockIds:
+    cur.execute("""INSERT INTO votes (id, label, count, source) values (%s, %s, %s, %s)""", (
+      geoid, '-1', 1, source))
+
 conn.commit()

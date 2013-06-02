@@ -16,7 +16,7 @@ from shapely.ops import cascaded_union
 from shapely.geometry import mapping, asShape
 from shapely import speedups
 
-def pickBestVote(votes, preferSmear=True, preferOfficial=True):
+def pickBestVoteHelper(votes, preferSmear=True, preferOfficial=True):
   maxVote = None
 
   selfVotes = [v for v in votes if v['source'] == 'self']
@@ -48,11 +48,64 @@ def pickBestVote(votes, preferSmear=True, preferOfficial=True):
 
   return maxVote
 
+def pickBestVote(votes, preferSmear=True, preferOfficial=True):
+  maxVote = pickBestVoteHelper(votes, preferSmear, preferOfficial)
+  if maxVote and maxVote['id'] == -1:
+    return None
+  else:
+    return maxVote
+
 def getAreaIdsForUserId(conn, userId):
   cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
   cur.execute("""select blockid FROM user_votes v JOIN geoplanet_places g ON v.woe_id = g.woe_id WHERE v.userid = %s""" % (userId))
   areaids = tuple(set([x['blockid'][0:5] for x in cur.fetchall()]))
   return areaids
+
+def addUserVotes(userVoteRows, votesDict):
+  dedupedRows = {}
+
+  # take your first positive vote, unless you have a negative vote that comes after it that invalidates that
+  for r in userVoteRows:
+    if r['blockid'] in dedupedRows:
+      if (
+        dedupedRows[r['blockid']]['weight'] == 1 and
+        dedupedRows[r['blockid']]['woe_id'] == r['woe_id'] and
+        r['weight'] == -1
+      ): 
+        dedupedRows[r['blockid']] = r
+      if r['weight'] == 1:
+        dedupedRows[r['blockid']] = r
+    else:
+      dedupedRows[r['blockid']] = r
+
+  for r in dedupedRows.values():
+    votes[r['blockid']].append({
+      'label': r['name'], 
+      'id': r['woe_id'], 
+      'source': 'self',
+      'count': r['weight']
+    })
+
+def buildVoteDict(rows):
+  votes = defaultdict(list)
+  for r in rows:
+    votes[r['id']].append({
+      'label': r['name'], 
+      'id': r['woe_id'], 
+      'count': r['count'], 
+      'source': r['source']
+    })
+  return votes
+
+def getVotesForBlocks(conn, blockids, user):
+  cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+  cur.execute("""select woe_id, id, label, count, source, name FROM votes v JOIN geoplanet_places ON label::int = woe_id WHERE id IN %s""", (tuple(blockids),))
+  votes = buildVoteDict(cur.fetchall())
+  if user:
+    userId = user['id']
+    cur.execute("""select g.woe_id, blockid, name, weight FROM user_votes v JOIN geoplanet_places g ON v.woe_id = g.woe_id WHERE v.userid = %s AND v.blockid IN %s ORDER BY g.woe_id, ts ASC""", (userId, tuple(blockids)))
+    addUserVotes(cur.fetchall(), votes)
+  return votes
 
 def getVotes(conn, areaid, user): 
   cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
@@ -65,14 +118,7 @@ def getVotes(conn, areaid, user):
 
   cur.execute("""select woe_id, id, label, count, source, name FROM votes v JOIN geoplanet_places ON label::int = woe_id WHERE id LIKE '%s%%'""" % (areaid))
 
-  votes = defaultdict(list)
-  for r in cur.fetchall():
-    votes[r['id']].append({
-      'label': r['name'], 
-      'id': r['woe_id'], 
-      'count': r['count'], 
-      'source': r['source']
-    })
+  votes = buildVoteDict(cur.fetchall())
  
   user_votes = {}
   print 'user? %s' % user
@@ -80,29 +126,7 @@ def getVotes(conn, areaid, user):
   if user:
     userId = user['id']
     cur.execute("""select g.woe_id, blockid, name, weight FROM user_votes v JOIN geoplanet_places g ON v.woe_id = g.woe_id WHERE v.userid = %s AND v.blockid LIKE '%s%%' ORDER BY g.woe_id, ts ASC""" % (userId, areaid))
-    dedupedRows = {}
-
-    # take your first positive vote, unless you have a negative vote that comes after it that invalidates that
-    for r in cur.fetchall():
-      if r['blockid'] in dedupedRows:
-        if (
-          dedupedRows[r['blockid']]['weight'] == 1 and
-          dedupedRows[r['blockid']]['woe_id'] == r['woe_id'] and
-          r['weight'] == -1
-        ): 
-          dedupedRows[r['blockid']] = r
-        if r['weight'] == 1:
-          dedupedRows[r['blockid']] = r
-      else:
-        dedupedRows[r['blockid']] = r
-
-    for r in dedupedRows.values():
-      votes[r['blockid']].append({
-        'label': r['name'], 
-        'id': r['woe_id'], 
-        'source': 'self',
-        'count': r['weight']
-      })
-
+    addUserVotes(cur.fetchall(), votes)
+    
   return (rows, votes)
 
