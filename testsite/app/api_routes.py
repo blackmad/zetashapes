@@ -54,7 +54,7 @@ def makeFeature(row, voteDict, user):
     "geometry": eval(row['geojson_geom']),
     "properties": {
       "id": row['geoid10'],
-      "votes": [x for x in [vote_utils.pickBestVote(voteDict[row['geoid10']])] if x]
+      "votes": vote_utils.pickBestVotes(voteDict[row['geoid10']])
     }
   }
 
@@ -158,7 +158,7 @@ def blockInfo():
   for (blockid, votes) in voteDict.iteritems():
     responseDict[blockid] = {
       'votes': votes,
-      'bestVote': vote_utils.pickBestVote(votes)
+      'bestVotes': vote_utils.pickBestVotes(votes)
     }
   
   return jsonify(responseDict)

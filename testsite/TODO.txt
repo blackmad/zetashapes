@@ -1,7 +1,9 @@
---change how we fetch votes
 --add neighborhood
+--allow overlaps
+--start using sqlalchemy everywhere
+
+--change how we fetch votes
 --figure out what to do about brooklyn piers
---build shape importer
 
 - Style these buttons! http://cl.ly/image/2V0i02413d12
 

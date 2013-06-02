@@ -16,7 +16,7 @@ from shapely.ops import cascaded_union
 from shapely.geometry import mapping, asShape
 from shapely import speedups
 
-def pickBestVoteHelper(votes, preferSmear=True, preferOfficial=True):
+def pickBestVotesHelper(votes, preferSmear=True, preferOfficial=True):
   maxVote = None
 
   selfVotes = [v for v in votes if v['source'] == 'self']
@@ -26,7 +26,7 @@ def pickBestVoteHelper(votes, preferSmear=True, preferOfficial=True):
     negativeSelfVotes = [v for v in selfVotes if v['count'] < 0]
     positiveSelfVotes = [v for v in selfVotes if v['count'] > 0]
     if negativeSelfVotes and not positiveSelfVotes:
-      return None
+      return []
     else:
       votes = positiveSelfVotes
       #print 'had positive self votes'
@@ -36,24 +36,28 @@ def pickBestVoteHelper(votes, preferSmear=True, preferOfficial=True):
   
   officialVotes = [v for v in votes if v['source'].startswith('official')]
   if preferOfficial and officialVotes and not positiveSelfVotes:
-    return officialVotes[0]
+    return [officialVotes[0],]
 
   blockrVotes = [v for v in votes if v['source'] == 'blockr']
   if preferSmear and blockrVotes and not positiveSelfVotes:
-    return blockrVotes[0]
+    return [blockrVotes[0],]
 
   smearVotes = [v for v in votes if v['source'] == 'smear']
   if preferSmear and smearVotes and not positiveSelfVotes:
-    return smearVotes[0]
+    return [smearVotes[0],]
+  
+  if maxVote:
+    return [maxVote,]
 
-  return maxVote
-
-def pickBestVote(votes, preferSmear=True, preferOfficial=True):
-  maxVote = pickBestVoteHelper(votes, preferSmear, preferOfficial)
-  if maxVote and maxVote['id'] == -1:
-    return None
+  return []
+  
+def pickBestVotes(votes, preferSmear=True, preferOfficial=True):
+  maxVotes = pickBestVotesHelper(votes, preferSmear, preferOfficial)
+  print maxVotes
+  if maxVotes and maxVotes[0]['id'] == -1:
+    return []
   else:
-    return maxVote
+    return maxVotes
 
 def getAreaIdsForUserId(conn, userId):
   cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
