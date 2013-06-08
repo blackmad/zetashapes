@@ -12,16 +12,16 @@ do_polygonize = True
 source = fiona.open(sys.argv[1], 'r')
 lines = []
 for index, feature in enumerate(source):
-    if index % 1000 == 0:
-      print "processed %s of %s" % (index, len(source))
-    if feature['geometry']['type'] == 'LineString':
-      coords = feature['geometry']['coordinates']
+  if index % 1000 == 0:
+    print "processed %s of %s" % (index, len(source))
+  if feature['geometry']['type'] == 'LineString':
+    coords = feature['geometry']['coordinates']
+    for (start, end) in zip(coords[:-1], coords[1:]):
+      lines.append(LineString([start, end]))
+  if feature['geometry']['type'] == 'MultiLineString':
+    for coords in feature['geometry']['coordinates']:
       for (start, end) in zip(coords[:-1], coords[1:]):
         lines.append(LineString([start, end]))
-    if feature['geometry']['type'] == 'MultiLineString':
-      for coords in feature['geometry']['coordinates']:
-        for (start, end) in zip(coords[:-1], coords[1:]):
-          lines.append(LineString([start, end]))
 
 print >>sys.stderr, "%d lines read." % len(source)
 

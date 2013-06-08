@@ -53,7 +53,7 @@ def pickBestVotesHelper(votes, preferSmear=True, preferOfficial=True):
   
 def pickBestVotes(votes, preferSmear=True, preferOfficial=True):
   maxVotes = pickBestVotesHelper(votes, preferSmear, preferOfficial)
-  print maxVotes
+  #print maxVotes
   if maxVotes and maxVotes[0]['id'] == -1:
     return []
   else:
@@ -83,7 +83,7 @@ def addUserVotes(userVoteRows, votesDict):
       dedupedRows[r['blockid']] = r
 
   for r in dedupedRows.values():
-    votes[r['blockid']].append({
+    votesDict[r['blockid']].append({
       'label': r['name'], 
       'id': r['woe_id'], 
       'source': 'self',
@@ -106,6 +106,7 @@ def getVotesForBlocks(conn, blockids, user):
   cur.execute("""select woe_id, id, label, count, source, name FROM votes v JOIN geoplanet_places ON label::int = woe_id WHERE id IN %s""", (tuple(blockids),))
   votes = buildVoteDict(cur.fetchall())
   if user:
+    print user
     userId = user['id']
     cur.execute("""select g.woe_id, blockid, name, weight FROM user_votes v JOIN geoplanet_places g ON v.woe_id = g.woe_id WHERE v.userid = %s AND v.blockid IN %s ORDER BY g.woe_id, ts ASC""", (userId, tuple(blockids)))
     addUserVotes(cur.fetchall(), votes)
