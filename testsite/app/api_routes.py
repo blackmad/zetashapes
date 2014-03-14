@@ -189,7 +189,7 @@ def getLabelsByArea(conn, areaid):
   statefp10 = areaid[0:2]
   countyfp10 = areaid[2:]
 
-  cur.execute("""select distinct(label, name) FROM votes v JOIN geoplanet_places ON label::int = woe_id WHERE id LIKE '%s%%'""" % (areaid))
+  cur.execute("""select distinct(label, name) FROM  """ + vote_utils.VOTES_TABLE + """ v JOIN geoplanet_places ON label::int = woe_id WHERE id LIKE '%s%%'""" % (areaid))
 
   rows = cur.fetchall()
 
@@ -225,7 +225,7 @@ def findUserByApiKey(api_key):
 def modifyUsersVoteCount(cur, userLevel, blockid, woeid, incr):
   conn = getPostgresConnection()
 
-  cur.execute("""update votes SET count = count + %s WHERE label=%s AND id=%s""", (
+  cur.execute("""update  """ + vote_utils.VOTES_TABLE + """ SET count = count + %s WHERE label=%s AND id=%s""", (
     incr, woeid, blockid
   ))
 
@@ -269,15 +269,8 @@ def do_vote():
   if len(votepairs) == 0:
     return jsonify({})
 
-  comm = cur.mogrify("""select * FROM user_votes WHERE userid=%s AND blockid IN %s""", (
-    userId,
-    tuple([v[0] for v in votepairs])
-  ))
-  #print comm
-  cur.execute(comm)
-
-  rows = cur.fetchall()
-  #print rows
+  rows = vote_utils.getUserVotesForBlocks(conn, userId, tuple([v[0] for v in votepairs]))
+   #print rows
   existing_votes = defaultdict(list)
   for v in rows:
     existing_votes[v['blockid']].append(v)
@@ -302,7 +295,7 @@ def do_vote():
         modifyUsersVoteCount(cur, user['level'], vote.blockid, existing_vote['woe_id'], -1*vote.weight)
 
     if not already_had_vote:
-      cur.execute("""select COUNT(*) as c FROM votes WHERE source='users' AND id=%s AND label=%s""", (
+      cur.execute("""select COUNT(*) as c FROM """ + vote_utils.VOTES_TABLE + """ WHERE source='users' AND id=%s AND label=%s""", (
         vote.blockid, vote.woe_id
       ))
       if cur.fetchone()['c'] > 0:
@@ -310,10 +303,10 @@ def do_vote():
         modifyUsersVoteCount(cur, user['level'], vote.blockid, vote.woe_id, vote.weight)
       else:
         #print 'trying to insert'
-        cur.execute("""INSERT INTO votes (id, label, count, source) values (%s, %s, %s, 'users')""", (
+        cur.execute("""INSERT INTO  """ + vote_utils.VOTES_TABLE + """ (id, label, count, source) values (%s, %s, %s, 'users')""", (
           vote.blockid, vote.woe_id, vote.weight))
     
-      cur.execute("""INSERT INTO user_votes (userid, blockid, woe_id, weight, ts) values (%s, %s, %s, %s, 'now')""", (
+      cur.execute("""INSERT INTO """ + vote_utils.USER_VOTES_TABLE + """ (userid, blockid, woe_id, weight, ts) values (%s, %s, %s, %s, 'now')""", (
         userId, vote.blockid, vote.woe_id, vote.weight))
     conn.commit()
         

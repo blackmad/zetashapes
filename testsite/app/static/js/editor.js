@@ -298,6 +298,21 @@ var MapPage = Backbone.View.extend({
     }
   },
 
+  doVote: function(voteString) {
+    if (voteString) {
+      $.ajax({
+        dataType: 'json',
+        url: '/api/vote',
+        type: 'POST',
+        data: { 
+          key: this.apiKey_,
+          votes: voteString
+        },
+        success: _.bind(this.updateHoods, this)
+      });
+    }
+  },
+
   exitBlockMode: function(vote) {
     $('.controls').toggleClass('blockMode neighborhoodMode');
     this.inBlockMode_ = false;
@@ -317,18 +332,7 @@ var MapPage = Backbone.View.extend({
         }
       }).join(';')
      
-      if (voteString) {
-        $.ajax({
-          dataType: 'json',
-          url: '/api/vote',
-          type: 'POST',
-          data: { 
-            key: this.apiKey_,
-            votes: voteString
-          },
-          success: _.bind(this.updateHoods, this)
-        });
-      }
+      doVote(voteString); 
     } else {
       _.each(this.clickedBlocks_, function(feature) {
         feature.properties.hoodId = feature.properties.originalHoodId;
@@ -646,27 +650,55 @@ var MapPage = Backbone.View.extend({
     }
   },
 
+  setupDeleteNeighborhoodModal: function() {
+    var modal = $('#neighborhoodDeleteModal');
+    var select = modal.find('.neighborhoodSelect');
+    _.each(_.sortBy(this.neighborhoodLabels_, function(l) { return l['label']; }), function(label) {
+      select.append($('<option>', { value: label['id'] }).text(label['label']));
+    });
+    
+    modal.find('.reassignButton').click(_.bind(function() {
+      var voteString = 
+        _.map(this.lastHighlightedNeighborhood_.feature.properties.blockids, function(blockid) {
+          var votes = [blockid, this.lastHighlightedNeighborhood_.feature.properties.id, '-1'].join(',') + ';' +
+            [blockid, select.val(), '1'].join(',');
+          return votes;
+        }, this).join(';');
+     
+      this.doVote(voteString); 
+
+      modal.modal('hide');
+      this.exitBlockMode(false);
+    }, this));
+
+    modal.find('.deleteHoodButton').click(_.bind(function() {
+      var voteString = 
+        _.map(this.lastHighlightedNeighborhood_.feature.properties.blockids, function(blockid) {
+          return [blockid, this.lastHighlightedNeighborhood_.feature.properties.id, '-1'].join(',');
+        }, this).join(';')
+     
+      this.doVote(voteString); 
+
+      modal.modal('hide');
+      this.exitBlockMode(false);
+    }, this));
+ 
+    modal.find('.closeButton').click(function() {
+      modal.modal('hide');
+    });
+  },
+
   deleteNeighborhood: function() {
+    console.log('entering deleteNeighborhod')
+    console.log(this)
     var modal = $('#neighborhoodDeleteModal');
 
     modal.find('.neighborhoodName').html(
       this.lastHighlightedNeighborhood_.feature.properties.label
     );
 
-    modal.find('.reassignButton').click(function() {
-      modal.modal('hide');
-    });
 
-    var select = modal.find('.neighborhoodSelect');
-    _.each(this.neighborhoodLabels_, function(label) {
-      select.append($('<option>', { value: label['id'] }).text(label['label']));
-    });
-
-    modal.find('.closeButton').click(function() {
-      modal.modal('hide');
-    });
-
-
+   
     modal.modal()
   },
 
@@ -678,7 +710,9 @@ var MapPage = Backbone.View.extend({
     this.$polygonMode.click(_.bind(this.togglePolygonMode, this))
     $('.exitAndSaveBlockModeButton').click(_.bind(function() { this.exitBlockMode(true); }, this)); 
     $('.exitAndUndoBlockModeButton').click(_.bind(function() { this.exitBlockMode(false); }, this)); 
+    console.log('renderData');
     $('.deleteButton').click(_.bind(function() { this.deleteNeighborhood(); }, this)); 
+    this.setupDeleteNeighborhoodModal();
 
     this.lastHighlightedNeighborhood_ = null;
     this.lastHighlightedBlocks_ = [];

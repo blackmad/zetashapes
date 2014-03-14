@@ -15,6 +15,10 @@ from itertools import groupby
 from shapely.ops import cascaded_union
 from shapely.geometry import mapping, asShape
 
+VOTES_TABLE = 'votes_dev'
+USER_VOTES_TABLE = 'user_votes_dev'
+
+
 def pickBestVotesHelper(votes, preferSmear=True, preferOfficial=True):
   maxVote = None
 
@@ -60,7 +64,7 @@ def pickBestVotes(votes, preferSmear=True, preferOfficial=True):
 
 def getAreaIdsForUserId(conn, userId):
   cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-  cur.execute("""select blockid FROM user_votes v JOIN geoplanet_places g ON v.woe_id = g.woe_id WHERE v.userid = %s""" % (userId))
+  cur.execute("""select blockid FROM  """ + USER_VOTES_TABLE + """  v JOIN geoplanet_places g ON v.woe_id = g.woe_id WHERE v.userid = %s""" % (userId))
   areaids = tuple(set([x['blockid'][0:5] for x in cur.fetchall()]))
   return areaids
 
@@ -100,14 +104,25 @@ def buildVoteDict(rows):
     })
   return votes
 
+def getUserVotesForBlocks(conn, userId, blockids):
+  cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+  comm = cur.mogrify("""select * FROM """ + USER_VOTES_TABLE + """ WHERE userid=%s AND blockid IN %s""", (
+    userId,
+    blockids
+  ))
+  #print comm
+  cur.execute(comm)
+
+  return cur.fetchall()
+
 def getVotesForBlocks(conn, blockids, user):
   cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-  cur.execute("""select woe_id, id, label, count, source, name FROM votes v JOIN geoplanet_places ON label::int = woe_id WHERE id IN %s""", (tuple(blockids),))
+  cur.execute("""select woe_id, id, label, count, source, name FROM """ + VOTES_TABLE + """ v JOIN geoplanet_places ON label::int = woe_id WHERE id IN %s""", (tuple(blockids),))
   votes = buildVoteDict(cur.fetchall())
   if user:
     print user
     userId = user['id']
-    cur.execute("""select g.woe_id, blockid, name, weight FROM user_votes v JOIN geoplanet_places g ON v.woe_id = g.woe_id WHERE v.userid = %s AND v.blockid IN %s ORDER BY g.woe_id, ts ASC""", (userId, tuple(blockids)))
+    cur.execute("""select g.woe_id, blockid, name, weight FROM """ + USER_VOTES_TABLE + """ v JOIN geoplanet_places g ON v.woe_id = g.woe_id WHERE v.userid = %s AND v.blockid IN %s ORDER BY g.woe_id, ts ASC""", (userId, tuple(blockids)))
     addUserVotes(cur.fetchall(), votes)
   return votes
 
@@ -120,16 +135,16 @@ def getVotes(conn, areaid, user):
   cur.execute("""select geoid10, ST_AsGeoJSON(ST_Transform(geom, 4326)) as geojson_geom FROM tabblock10 tb WHERE statefp10 = %s AND countyfp10 = %s AND blockce10 NOT LIKE '0%%'""", (statefp10, countyfp10))
   rows = cur.fetchall()
 
-  cur.execute("""select woe_id, id, label, count, source, name FROM votes v JOIN geoplanet_places ON label::int = woe_id WHERE id LIKE '%s%%'""" % (areaid))
+  cur.execute("""select woe_id, id, label, count, source, name FROM """ + VOTES_TABLE + """ v JOIN geoplanet_places ON label::int = woe_id WHERE id LIKE '%s%%'""" % (areaid))
 
   votes = buildVoteDict(cur.fetchall())
- 
+
   user_votes = {}
   print 'user? %s' % user
   print user
   if user:
     userId = user['id']
-    cur.execute("""select g.woe_id, blockid, name, weight FROM user_votes v JOIN geoplanet_places g ON v.woe_id = g.woe_id WHERE v.userid = %s AND v.blockid LIKE '%s%%' ORDER BY g.woe_id, ts ASC""" % (userId, areaid))
+    cur.execute("""select g.woe_id, blockid, name, weight FROM """ + USER_VOTES_TABLE + """ v JOIN geoplanet_places g ON v.woe_id = g.woe_id WHERE v.userid = %s AND v.blockid LIKE '%s%%' ORDER BY g.woe_id, ts ASC""" % (userId, areaid))
     addUserVotes(cur.fetchall(), votes)
     
   return (rows, votes)
