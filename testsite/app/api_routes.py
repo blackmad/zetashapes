@@ -139,7 +139,7 @@ def getNeighborhoodsByArea(areaid, user):
   intent = request.args.get('intent', None)
   if intent == 'download':
     jresponse.headers['Content-Disposition'] = 'attachment; filename=%s.json' % areaid
-  print jresponse
+  # print jresponse
 
   return jresponse
 
