@@ -332,7 +332,7 @@ var MapPage = Backbone.View.extend({
         }
       }).join(';')
      
-      doVote(voteString); 
+      this.doVote(voteString); 
     } else {
       _.each(this.clickedBlocks_, function(feature) {
         feature.properties.hoodId = feature.properties.originalHoodId;

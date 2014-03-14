@@ -18,7 +18,6 @@ from shapely.geometry import mapping, asShape
 VOTES_TABLE = 'votes_dev'
 USER_VOTES_TABLE = 'user_votes_dev'
 
-
 def pickBestVotesHelper(votes, preferSmear=True, preferOfficial=True):
   maxVote = None
 
@@ -36,6 +35,8 @@ def pickBestVotesHelper(votes, preferSmear=True, preferOfficial=True):
 
   usersVotes = [v for v in votes if v['source'] == 'users']
   if preferSmear and usersVotes and not positiveSelfVotes:
+    usersVotes.sort(key=lambda x: x['count'] * -1)
+    print usersVotes
     return [usersVotes[0],]
   
   officialVotes = [v for v in votes if v['source'].startswith('official')]
