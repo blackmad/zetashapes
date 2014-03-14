@@ -187,6 +187,7 @@ var MapPage = Backbone.View.extend({
     this.debugLog('made it to areainfo')
     this.debugLog(data)
     this.map_.fitBounds(L.geoJson(data.areas[0].bbox).getBounds());
+    this.neighborhoodLabels_ = data.areas[0].neighborhoods
     this.centered = true;
   },
 
@@ -194,7 +195,11 @@ var MapPage = Backbone.View.extend({
     this.debugLog('fetching ' + areaid)
     $.ajax({
       dataType: 'json',
-      url: '/static/json/info-' + areaid + '.json',
+      // url: '/static/json/info-' + areaid + '.json',
+      url: '/api/areaInfo?callback=?',
+      data: {
+        'areaid': areaid
+      },
       success: _.bind(this.renderAreaInfo, this)
     })
 
@@ -579,7 +584,7 @@ var MapPage = Backbone.View.extend({
       layer.feature = feature;
       this.neighborhoodIdToLayerMap_[feature.properties.id] = layer;
       if (!this.centered) {
-        window.this.debugLog(feature);
+        this.debugLog(feature);
         if (feature.geometry.type == "Polygon") {
           this.map_.panTo(new L.LatLng(feature.geometry.coordinates[0][0][1], feature.geometry.coordinates[0][0][0]));
         } else {
@@ -641,6 +646,30 @@ var MapPage = Backbone.View.extend({
     }
   },
 
+  deleteNeighborhood: function() {
+    var modal = $('#neighborhoodDeleteModal');
+
+    modal.find('.neighborhoodName').html(
+      this.lastHighlightedNeighborhood_.feature.properties.label
+    );
+
+    modal.find('.reassignButton').click(function() {
+      modal.modal('hide');
+    });
+
+    var select = modal.find('.neighborhoodSelect');
+    _.each(this.neighborhoodLabels_, function(label) {
+      select.append($('<option>', { value: label['id'] }).text(label['label']));
+    });
+
+    modal.find('.closeButton').click(function() {
+      modal.modal('hide');
+    });
+
+
+    modal.modal()
+  },
+
   renderData: function(geojson) {
     this.updateStatus('loaded neighborhood outlines');
     this.neighborhoodsLoaded_ = true;
@@ -649,6 +678,7 @@ var MapPage = Backbone.View.extend({
     this.$polygonMode.click(_.bind(this.togglePolygonMode, this))
     $('.exitAndSaveBlockModeButton').click(_.bind(function() { this.exitBlockMode(true); }, this)); 
     $('.exitAndUndoBlockModeButton').click(_.bind(function() { this.exitBlockMode(false); }, this)); 
+    $('.deleteButton').click(_.bind(function() { this.deleteNeighborhood(); }, this)); 
 
     this.lastHighlightedNeighborhood_ = null;
     this.lastHighlightedBlocks_ = [];

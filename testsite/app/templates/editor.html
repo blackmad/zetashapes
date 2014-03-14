@@ -29,6 +29,7 @@
           <span class="titleHelp">Now editing:</span> <span class="neighborhoodInfo"></span>
           <button type="button" class="exitAndSaveBlockModeButton" class="btn btn-primary">Save Edits</button>
           <button type="button" class="exitAndUndoBlockModeButton" class="btn btn-primary">Exit and Undo Edits</button>
+          <button type="button" class="deleteButton" class="btn btn-primary">Delete</button>
           <a href="#" data-toggle="tooltip" title="instructions" class="helpButton">Editing Instructions</a>
           <span class="polygonModeAction"></span> <span class="drawMode"></span> mode
         </div>
@@ -72,6 +73,23 @@
   <div class="modal-footer">
     <a href="#" class="btn closeButton">Cancel</a>
     <a href="#" class="btn btn-primary saveButton">Save changes</a>
+  </div>
+</div>
+
+<div class="modal hide fade" id="neighborhoodDeleteModal">
+  <div class="modal-header">
+    <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+    <h3>Delete <span class="neighborhoodName"></span>?</h3>
+  </div>
+  <div class="modal-body">
+    <div class="ui-widget">
+      <p>Reassign blocks to: <select class="neighborhoodSelect"></select></p>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <a href="#" class="btn closeButton">Cancel</a>
+    <a href="#" class="btn btn-primary reassignButton">Delete and Reassign Blocks</a>
+    <a href="#" class="btn btn-primary deleteButton">Delete Neighborhood</a>
   </div>
 </div>
 

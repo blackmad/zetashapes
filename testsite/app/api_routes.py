@@ -23,6 +23,22 @@ import geo_utils
 import vote_utils
 import sqlalchemy.pool as pool
 
+def getPostgresConnection():
+  print app.config['SQLALCHEMY_DATABASE_URI']
+  import urlparse
+  result = urlparse.urlparse(app.config['SQLALCHEMY_DATABASE_URI'])
+  username = result.username
+  password = result.password
+  database = result.path[1:]
+  hostname = result.hostname
+  return psycopg2.connect(
+      database = database,
+      user = username,
+      password = password,
+      host = hostname
+  )
+
+
 def jsonify(*args, **kwargs):
   return current_app.response_class(json.dumps(dict(*args, **kwargs), indent=None), mimetype='application/json')
 
@@ -32,7 +48,6 @@ if speedups.available:
 
 # start using sqlalchemy cursor, models etc, please
 psycopg2 = pool.manage(psycopg2)
-
 
 def support_jsonp(f):
     """Wraps JSONified output for JSONP"""
@@ -64,7 +79,7 @@ def makeFeatures(rows, voteDict, user):
 @app.route('/api/stateCounts', methods=['GET'])
 @support_jsonp
 def stateCounts():
-  conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
+  conn = getPostgresConnection()
   cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
   cur.execute("""select areaid, count, name10  FROM area_counts JOIN tl_2010_us_state10 ON areaid = geoid10 where char_length(areaid) = 2""")
   rows = cur.fetchall()
@@ -79,7 +94,7 @@ def stateCounts():
 @app.route('/api/blocksByGeom', methods=['GET'])
 @support_jsonp
 def blocksByArea():
-  conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
+  conn = getPostgresConnection()
   cur = conn.cursor()
 
   ll = request.args.get('ll', False)
@@ -96,7 +111,7 @@ def blocksByArea():
 @app.route('/api/blocksByArea', methods=['GET'])
 @support_jsonp
 def citydata():
-  conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
+  conn = getPostgresConnection()
   areaid = request.args.get('areaid', False)
   apikey = request.args.get('key', '')
 
@@ -111,7 +126,7 @@ def citydata():
   return jsonify(response)
 
 def getNeighborhoodsByArea(areaid, user):
-  conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
+  conn = getPostgresConnection()
   neighborhoods = geo_utils.getNeighborhoodsGeoJsonByArea(conn, areaid, user)
   
   response = {
@@ -131,7 +146,7 @@ def getNeighborhoodsByArea(areaid, user):
 @app.route('/api/neighborhoodsByArea', methods=['GET'])
 @support_jsonp
 def neighborhoodsByArea():
-  conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
+  conn = getPostgresConnection()
   areaid = request.args.get('areaid', False)
   apikey = request.args.get('key', '')
   user = findUserByApiKey(apikey)
@@ -140,9 +155,14 @@ def neighborhoodsByArea():
 @app.route('/api/areaInfo')
 @support_jsonp
 def areaInfo():
-  conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
+  conn = getPostgresConnection()
   areaid = request.args.get('areaid', '').split(',')
   areaInfos = geo_utils.getInfoForAreaIds(conn, areaid)
+
+  for info in areaInfos:
+    areaid = info['areaid']
+    info['neighborhoods'] = getLabelsByArea(conn, areaid)
+
   return jsonify({'areas': areaInfos})
 
 @app.route('/api/blockInfo')
@@ -150,7 +170,7 @@ def areaInfo():
 def blockInfo():
   apikey = request.args.get('key', '')
   user = findUserByApiKey(apikey)
-  conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
+  conn = getPostgresConnection()
   blockids = request.args.get('blockid', '').split(',')
   voteDict = vote_utils.getVotesForBlocks(conn, blockids, user)
 
@@ -163,13 +183,8 @@ def blockInfo():
   
   return jsonify(responseDict)
 
-@app.route('/api/labels', methods=['GET'])
-@support_jsonp
-def labels():
-  conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
+def getLabelsByArea(conn, areaid):
   cur = conn.cursor()
-
-  areaid = request.args.get('areaid', False)
 
   statefp10 = areaid[0:2]
   countyfp10 = areaid[2:]
@@ -186,13 +201,21 @@ def labels():
       id = m.group(1)
       label = m.group(2).replace('"', '')
       response.append({'id': id, 'label': label})
-      
+     
+  return response
+
+@app.route('/api/labels', methods=['GET'])
+@support_jsonp
+def labels():
+  conn = getPostgresConnection()
+  areaid = request.args.get('areaid', False)
+  response = getLabelsByArea(conn, areaid)
   return jsonify({'labels': response})
 
 # this should probably go through the user model? meh
 def findUserByApiKey(api_key):
   if (api_key):
-    conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
+    conn = getPostgresConnection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     cur.execute("""select * FROM users WHERE api_key=%s""",  (api_key,))
     return cur.fetchone()
@@ -200,7 +223,7 @@ def findUserByApiKey(api_key):
     return None
 
 def modifyUsersVoteCount(cur, userLevel, blockid, woeid, incr):
-  conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
+  conn = getPostgresConnection()
 
   cur.execute("""update votes SET count = count + %s WHERE label=%s AND id=%s""", (
     incr, woeid, blockid
@@ -212,7 +235,7 @@ IncomingBlockVote = namedtuple('IncomingBlockVote', ['blockid', 'woe_id', 'weigh
 @app.route('/api/vote', methods=['POST', 'GET'])
 @support_jsonp
 def do_vote():
-  conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
+  conn = getPostgresConnection()
   cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
   votepairs = []
   formdata = request.form or request.args

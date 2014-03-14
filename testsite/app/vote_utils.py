@@ -14,7 +14,6 @@ import os
 from itertools import groupby
 from shapely.ops import cascaded_union
 from shapely.geometry import mapping, asShape
-from shapely import speedups
 
 def pickBestVotesHelper(votes, preferSmear=True, preferOfficial=True):
   maxVote = None
@@ -22,17 +21,18 @@ def pickBestVotesHelper(votes, preferSmear=True, preferOfficial=True):
   selfVotes = [v for v in votes if v['source'] == 'self']
   positiveSelfVotes = None
   if len(selfVotes) > 0:
-    #print 'selfvotes: %s' % selfVotes
     negativeSelfVotes = [v for v in selfVotes if v['count'] < 0]
     positiveSelfVotes = [v for v in selfVotes if v['count'] > 0]
     if negativeSelfVotes and not positiveSelfVotes:
       return []
     else:
       votes = positiveSelfVotes
-      #print 'had positive self votes'
-      #print votes
   if not maxVote and len(votes) > 0:
     maxVote = max(votes, key=lambda x:x['count'])
+
+  usersVotes = [v for v in votes if v['source'] == 'users']
+  if preferSmear and usersVotes and not positiveSelfVotes:
+    return [usersVotes[0],]
   
   officialVotes = [v for v in votes if v['source'].startswith('official')]
   if preferOfficial and officialVotes and not positiveSelfVotes:
@@ -53,7 +53,6 @@ def pickBestVotesHelper(votes, preferSmear=True, preferOfficial=True):
   
 def pickBestVotes(votes, preferSmear=True, preferOfficial=True):
   maxVotes = pickBestVotesHelper(votes, preferSmear, preferOfficial)
-  print maxVotes
   if maxVotes and maxVotes[0]['id'] == -1:
     return []
   else:
@@ -83,7 +82,7 @@ def addUserVotes(userVoteRows, votesDict):
       dedupedRows[r['blockid']] = r
 
   for r in dedupedRows.values():
-    votes[r['blockid']].append({
+    votesDict[r['blockid']].append({
       'label': r['name'], 
       'id': r['woe_id'], 
       'source': 'self',
