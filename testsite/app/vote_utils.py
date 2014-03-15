@@ -119,7 +119,7 @@ def getUserVotesForBlocks(conn, userId, blockids):
 
 def getVotesForBlocks(conn, blockids, user):
   cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-  cur.execute("""select woe_id, id, label, count, source, name FROM """ + VOTES_TABLE + """ v JOIN geoplanet_places ON label::int = woe_id WHERE id IN %s""", (tuple(blockids),))
+  cur.execute("""select woe_id, id, label, count, v.source, name FROM """ + VOTES_TABLE + """ v JOIN geoplanet_places ON label::int = woe_id WHERE id IN %s""", (tuple(blockids),))
   votes = buildVoteDict(cur.fetchall())
   if user:
     print user
@@ -133,20 +133,31 @@ def getVotes(conn, areaid, user):
 
   statefp10 = areaid[0:2]
   countyfp10 = areaid[2:]
+  if not areaid:
+    raise Exception("uh, missing areaid???")
+  print areaid
 
+  print 'getting blocks with geoms'
   cur.execute("""select geoid10, ST_AsGeoJSON(ST_Transform(geom, 4326)) as geojson_geom FROM tabblock10 tb WHERE statefp10 = %s AND countyfp10 = %s AND blockce10 NOT LIKE '0%%'""", (statefp10, countyfp10))
   rows = cur.fetchall()
+  print 'got'
 
-  cur.execute("""select woe_id, id, label, count, source, name FROM """ + VOTES_TABLE + """ v JOIN geoplanet_places ON label::int = woe_id WHERE id LIKE '%s%%'""" % (areaid))
+  print 'getting votes'
+  print ("""select woe_id, id, label, count, v.source, name FROM """ + VOTES_TABLE + """ v JOIN geoplanet_places ON label::int = woe_id WHERE id LIKE '%s%%'""" % (areaid))
+  cur.execute("""select woe_id, id, label, count, v.source, name FROM """ + VOTES_TABLE + """ v JOIN geoplanet_places ON label::int = woe_id WHERE id LIKE '%s%%'""" % (areaid))
+  globalVotes = cur.fetchall()
+  print 'got'
 
-  votes = buildVoteDict(cur.fetchall())
+  votes = buildVoteDict(globalVotes)
 
   user_votes = {}
   print 'user? %s' % user
   print user
   if user:
     userId = user['id']
+    print 'getting user votes'
     cur.execute("""select g.woe_id, blockid, name, weight FROM """ + USER_VOTES_TABLE + """ v JOIN geoplanet_places g ON v.woe_id = g.woe_id WHERE v.userid = %s AND v.blockid LIKE '%s%%' ORDER BY g.woe_id, ts ASC""" % (userId, areaid))
+    print 'got'
     addUserVotes(cur.fetchall(), votes)
     
   return (rows, votes)

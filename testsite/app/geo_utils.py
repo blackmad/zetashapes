@@ -74,7 +74,9 @@ def getBlocks(conn, blockids):
 
 NeighborhoodArea = namedtuple('NeighborhoodArea', ['shape', 'blockids'])
 def getNeighborhoodsByArea(conn, areaid, user):
+  print 'getting votes'
   (blocks, allVotes) = vote_utils.getVotes(conn, areaid, user)
+  print 'got votes'
 
   blocks_by_hoodid = defaultdict(list)
   blockids_by_hoodid = defaultdict(list)
@@ -91,6 +93,7 @@ def getNeighborhoodsByArea(conn, areaid, user):
       id_to_label[maxVote['id']] = maxVote['label']
 
   hoods = {}
+  print 'doing unions'
   for (id, geoms) in blocks_by_hoodid.iteritems():
     hoods[id] = NeighborhoodArea(cascaded_union(geoms), blockids_by_hoodid[id])
   return (hoods, id_to_label)
