@@ -27,16 +27,16 @@ def pickBestVotesHelper(votes, preferSmear=True, preferOfficial=True):
     negativeSelfVotes = [v for v in selfVotes if v['count'] < 0]
     positiveSelfVotes = [v for v in selfVotes if v['count'] > 0]
     if negativeSelfVotes and not positiveSelfVotes:
-      return []
+      pass
     else:
       votes = positiveSelfVotes
   if not maxVote and len(votes) > 0:
     maxVote = max(votes, key=lambda x:x['count'])
 
-  usersVotes = [v for v in votes if v['source'] == 'users']
-  if preferSmear and usersVotes and not positiveSelfVotes:
+  negativeSelfBlocks = set([b['id'] for b in negativeSelfVotes])
+  usersVotes = [v for v in votes if v['source'] == 'users' and v['id'] not in negativeSelfBlocks]
+  if usersVotes and not positiveSelfVotes:
     usersVotes.sort(key=lambda x: x['count'] * -1)
-    print usersVotes
     return [usersVotes[0],]
   
   officialVotes = [v for v in votes if v['source'].startswith('official')]
