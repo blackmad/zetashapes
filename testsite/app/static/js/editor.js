@@ -9,6 +9,17 @@ function cloneLatLng(ll) {
   return new L.LatLng(ll.lat, ll.lng);
 };
 
+$.parseParams = function(p){
+var ret = {},
+    seg = p.replace(/^\?/,'').split('&'),
+    len = seg.length, i = 0, s;
+for (;i<len;i++) {
+    if (!seg[i]) { continue; }
+    s = seg[i].split('=');
+    ret[s[0]] = s[1];
+}
+return ret;}
+
 var MapPage = Backbone.View.extend({
   debugLog: function(s) {
     if (this.debug_) {
@@ -127,6 +138,11 @@ var MapPage = Backbone.View.extend({
 
   initialize: function() {
     this.debug_ = false;
+    this.params_ = $.parseParams((window.location.search || window.location.hash).substring(1));
+    if (this.params_['debug']) {
+      this.debug_ = true;
+    }
+
     key('c', _.bind(function(){ this.toggleDrawMode('continuous', 'polygon') }, this));
     key('p', _.bind(function(){ this.toggleDrawMode('polygon', 'continous') }, this));
     key('r', _.bind(function(){ this.changePolygonMode('redraw') }, this));
@@ -573,6 +589,7 @@ var MapPage = Backbone.View.extend({
     this.updateStatus('added block layer to map');
     this.hideBlocks();
     this.updateStatus('hiding block layer until later');
+    this.updateStatus('Reticulating Splines');
 
     this.blockLoader_.trigger('loaded');
     // this.map_.boxZoom.disable();
