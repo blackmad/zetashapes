@@ -65,7 +65,7 @@ def getInfoForAreaIds(conn, areaids):
 def getInfoForNearbyAreaIds(conn, areaids):
   if areaids:
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    cur.execute("""select *,ST_AsGeoJson(c1.geom) as geojson, ST_AsGeoJson(ST_Envelope(c1.geom)) as bbox FROM tl_2010_us_county10 c1 JOIN (select geom FROM tl_2010_us_county10 WHERE geoid10 IN %s) c2 ON c1.geom && c2.geom;""", (tuple(areaids),))
+    cur.execute("""select *,ST_AsGeoJson(c1.geom) as geojson, ST_AsGeoJson(ST_Envelope(c1.geom)) as bbox FROM tl_2010_us_county10 c1 JOIN (select geom FROM tl_2010_us_county10 WHERE geoid10 IN %s) c2 ON c1.geom && c2.geom WHERE geoid10 NOT IN %s""", (tuple(areaids), tuple(areaids)))
     rows = cur.fetchall()
     return areaInfo(rows)
   else:

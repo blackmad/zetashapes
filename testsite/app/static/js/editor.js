@@ -197,6 +197,7 @@ var MapPage = Backbone.View.extend({
       this.renderData(this.options.geojson);
     } else {
       this.fetchData(this.options.areaid);
+      this.fetchNearbyData(this.options.areaid);
     }
 
     $('.helpButton').click(function() {
@@ -208,9 +209,44 @@ var MapPage = Backbone.View.extend({
     this.debugLog('made it to areainfo')
     this.debugLog(data)
     this.map_.fitBounds(L.geoJson(data.areas[0].bbox).getBounds());
+    this.updateStatus('Loading blocks ...')
     this.neighborhoodLabels_ = data.areas[0].neighborhoods;
     this.cityLabels_ = data.areas[0].cities;
     this.centered = true;
+  },
+
+  renderNearbyAreaInfo: function(data) {
+    this.debugLog('made it to areainfo')
+    this.debugLog(data)
+    _.each(data.areas, function(area) {
+        var geom = L.geoJson(area.geom);
+        geom.bindLabel('Click to load ' + area.displayName);
+        this.map_.addLayer(geom);
+
+        var mouseOverCb = function(e) {
+          geom.setStyle(this.grayStyleHover);
+        }
+        var mouseOutCb = function(e) {
+          geom.setStyle(this.grayStyle);
+        }
+        geom.setStyle(this.grayStyle);
+
+        geom.on('mouseover', _.bind(mouseOverCb, this));
+        geom.on('mouseout', _.bind(mouseOutCb, this))
+
+    }, this);
+  },
+
+  fetchNearbyData: function(areaid) {
+   this.debugLog('fetching ' + areaid)
+    $.ajax({
+      dataType: 'json',
+      url: '/api/nearbyAreas?callback=?',
+      data: {
+        'areaid': areaid
+      },
+      success: _.bind(this.renderNearbyAreaInfo, this)
+    })
   },
 
   fetchData: function(areaid) {
@@ -223,7 +259,7 @@ var MapPage = Backbone.View.extend({
         'areaid': areaid
       },
       success: _.bind(this.renderAreaInfo, this)
-    })
+    }); 
 
     this.requestsOutstanding_ += 1
     $.ajax({
@@ -455,6 +491,17 @@ var MapPage = Backbone.View.extend({
     color: 'white',
     fillColor: 'white',
     fillOpacity: 0.01
+  },
+
+  grayStyle : {
+    'weight': 0.5,
+    'fillOpacity': 0.0,
+    'color': 'gray'
+  },
+   grayStyleHover : {
+    'weight': 0.5,
+    'fillOpacity': 0.4,
+    'color': 'gray'
   },
 
   highlightBlockStyle: function(color) { return {
