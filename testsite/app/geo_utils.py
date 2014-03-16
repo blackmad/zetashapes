@@ -42,6 +42,8 @@ def areaInfo(rows):
     }
     if 'bbox' in r:
       d['bbox'] = json.loads(r['bbox'])
+    if 'geojson' in r:
+      d['geom'] = json.loads(r['geojson'])
     responses.append(d)
   return responses
 
@@ -55,6 +57,15 @@ def getInfoForAreaIds(conn, areaids):
   if areaids:
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     cur.execute("""select *,ST_AsGeoJson(ST_Envelope(geom)) as bbox  FROM tl_2010_us_county10 WHERE geoid10 IN %s""", (tuple(areaids),))
+    rows = cur.fetchall()
+    return areaInfo(rows)
+  else:
+    return []
+
+def getInfoForNearbyAreaIds(conn, areaids):
+  if areaids:
+    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    cur.execute("""select *,ST_AsGeoJson(c1.geom) as geojson, ST_AsGeoJson(ST_Envelope(c1.geom)) as bbox FROM tl_2010_us_county10 c1 JOIN (select geom FROM tl_2010_us_county10 WHERE geoid10 IN %s) c2 ON c1.geom && c2.geom;""", (tuple(areaids),))
     rows = cur.fetchall()
     return areaInfo(rows)
   else:

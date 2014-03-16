@@ -187,6 +187,14 @@ def neighborhoodsByArea():
   user = findUserByApiKey(conn, apikey)
   return getNeighborhoodsByArea(conn, areaid, user)
 
+@app.route('/api/nearbyAreas')
+@support_jsonp
+def nearbyAreaInfo():
+  conn = getPostgresConnection()
+  areaid = request.args.get('areaid', '').split(',')
+  nearbyAreaInfos = geo_utils.getInfoForNearbyAreaIds(conn, areaid)
+  return jsonify({'areas': nearbyAreaInfos})
+
 @app.route('/api/areaInfo')
 @support_jsonp
 def areaInfo():
