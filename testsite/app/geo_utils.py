@@ -71,42 +71,32 @@ def getInfoForNearbyAreaIds(conn, areaids):
   else:
     return []
 
-def getBlocks(conn, blockids):
-  if blockids:
-    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    cur.execute("""select geoid10,ST_AsGeoJson(geom) as geojson FROM tabblock10 WHERE geoid10 IN %s""", (tuple(blockids),))
-    rows = cur.fetchall()
-    d = {}
-    for r in rows:
-      d[r['geoid10']] = r['geojson']
-    return d
-  else:
-    return {}
-
-NeighborhoodArea = namedtuple('NeighborhoodArea', ['shape', 'blockids'])
+NeighborhoodArea = namedtuple('NeighborhoodArea', ['shape', 'blockids', 'pop10', 'housing10'])
 def getNeighborhoodsByArea(conn, areaid, user):
   print 'getting votes'
   (blocks, allVotes) = vote_utils.getVotes(conn, areaid, user)
   print 'got votes'
 
   blocks_by_hoodid = defaultdict(list)
-  blockids_by_hoodid = defaultdict(list)
   id_to_label = {}
 
   for block in blocks:
-    geom = asShape(eval(block['geojson_geom']))
     votes = allVotes[block['geoid10']]
     #print block['geoid10']
     maxVotes = vote_utils.pickBestVotes(votes)
     for maxVote in maxVotes:
-      blocks_by_hoodid[maxVote['id']].append(geom)
-      blockids_by_hoodid[maxVote['id']].append(block['geoid10'])
+      blocks_by_hoodid[maxVote['id']].append(block)
       id_to_label[maxVote['id']] = maxVote['label']
 
   hoods = {}
   print 'doing unions'
-  for (id, geoms) in blocks_by_hoodid.iteritems():
-    hoods[id] = NeighborhoodArea(cascaded_union(geoms), blockids_by_hoodid[id])
+  for (id, blocks) in blocks_by_hoodid.iteritems():
+    geoms = [asShape(eval(block['geojson_geom'])) for block in blocks]
+    blockids = [block['geoid10'] for block in blocks]
+    pop10 = sum([block['pop10'] for block in blocks])
+    housing10 = sum([block['housing10'] for block in blocks])
+
+    hoods[id] = NeighborhoodArea(cascaded_union(geoms), blockids, pop10, housing10)
   return (hoods, id_to_label)
 
 def getNeighborhoodsGeoJsonByArea(conn, areaid, user):
@@ -119,7 +109,9 @@ def getNeighborhoodsGeoJsonByArea(conn, areaid, user):
       'properties': {
         'id': id,
         'label': id_to_label[id],
-        'blockids': nhoodarea.blockids
+        'blockids': nhoodarea.blockids,
+        'pop10': nhoodarea.pop10,
+        'housing10': nhoodarea.housing10
       },
       'geometry': mapping(nhoodarea.shape)
     }

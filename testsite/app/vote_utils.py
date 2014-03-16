@@ -138,7 +138,7 @@ def getVotes(conn, areaid, user):
   print areaid
 
   print 'getting blocks with geoms'
-  cur.execute("""select geoid10, ST_AsGeoJSON(ST_Transform(geom, 4326)) as geojson_geom FROM tabblock10 tb WHERE statefp10 = %s AND countyfp10 = %s AND blockce10 NOT LIKE '0%%'""", (statefp10, countyfp10))
+  cur.execute("""select geoid10, pop10, housing10, ST_AsGeoJSON(ST_Transform(geom, 4326)) as geojson_geom FROM tabblock2010_pophu tb WHERE statefp10 = %s AND countyfp10 = %s AND blockce10 NOT LIKE '0%%'""", (statefp10, countyfp10))
   rows = cur.fetchall()
   print 'got'
 

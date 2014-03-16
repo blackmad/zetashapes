@@ -127,23 +127,6 @@ def addHood():
   print resp
   return resp
 
-@app.route('/api/blocksByGeom', methods=['GET'])
-@support_jsonp
-def blocksByArea():
-  conn = getPostgresConnection()
-  cur = conn.cursor()
-
-  ll = request.args.get('ll', False)
-  if len(ll.split(',')) < 4:
-    wkt = 'LINESTRING(%s)' % ll
-  else: 
-    wkt = 'POLYGON((%s))' % ll
-
-  comm = cur.mogrify("""select geoid10 FROM tabblock10 tb WHERE ST_Intersects(geom, ST_Transform(ST_GeomFromText(%s, 4326), 4326)) AND blockce10 NOT LIKE '0%%'""", (wkt,))
-  cur.execute(comm)
-  rows = cur.fetchall()
-  return jsonify({'ids': [r[0] for r in rows]})
-
 @app.route('/api/blocksByArea', methods=['GET'])
 @support_jsonp
 def citydata():
