@@ -811,13 +811,15 @@ var MapPage = Backbone.View.extend({
       var selectedHood = sel.val();
       var hoodId = null
       if (neighborhoodMap[selectedHood]) {
-        neighborhoodMap[selectedHood]['id'];
+        hoodId = neighborhoodMap[selectedHood]['id'];
       }
       var layer = this.neighborhoodIdToLayerMap_[hoodId];
 
       if (!hoodId || !layer) {
+        var needsAdd = false;
         if (hoodId == undefined) {
           hoodId = this.addHoodTempId_;
+          needsAdd = true;
         }
 
         this.lastHighlightedNeighborhood_ = {
@@ -825,7 +827,7 @@ var MapPage = Backbone.View.extend({
             'properties': {
               'label': selectedHood,
               'id': hoodId,
-              'needsAdd': true,
+              'needsAdd': needsAdd,
               'city': modal.find('.citySelect').val(),
               'blockids': []
             }
@@ -842,6 +844,7 @@ var MapPage = Backbone.View.extend({
       $('.controls').show();
       this.setCurrentNeighborhoodName(selectedHood);
       this.enterBlockMode();
+      return false;
     }, this));
 
     modal.on('hidden.bs.modal', function (e) {

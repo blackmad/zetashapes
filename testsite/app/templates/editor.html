@@ -16,7 +16,7 @@
         <div class="neighborhoodControls nohover">
           {%- if current_user.is_authenticated() -%}
             <span class="titleHelp">Click on a neighborhood to edit its boundary or
-              <a href="" class="addButton" class="btn btn-primary">Add missing neighborhood</a>
+              <a href="#" class="addButton" class="btn btn-primary">Add missing neighborhood</a>
             </span>
             <span class="downloadLink nohover"><a href="/api/neighborhoodsByArea?areaid={{ areaid }}&key={{current_user.api_key }}&intent=download">download</a></span>
             <!--'Polygon mode': <button type="button" id="polygonMode" class="btn btn-primary" data-loading-text="Off" data-toggle="button">On</button>-->
