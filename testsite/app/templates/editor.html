@@ -15,12 +15,10 @@
       <div class="controls neighborhoodMode loading">
         <div class="neighborhoodControls nohover">
           {%- if current_user.is_authenticated() -%}
-            <span class="titleHelp nohover">Click on a neighborhood to edit its boundary</span>
-            <span class="addButtonContainer nohover">
-              <button type="button" class="addButton" class="btn btn-primary">Add missing neighborhood</button>
+            <span class="titleHelp">Click on a neighborhood to edit its boundary or
+              <a href="" class="addButton" class="btn btn-primary">Add missing neighborhood</a>
             </span>
             <span class="downloadLink nohover"><a href="http://zetashapes.com/api/neighborhoodsByArea?areaid={{ areaid }}&key={{current_user.api_key }}&intent=download">download</a></span>
-            <span class="titleHelp hover">Click to edit:</span> <span class="neighborhoodInfo hover"></span>
             <!--'Polygon mode': <button type="button" id="polygonMode" class="btn btn-primary" data-loading-text="Off" data-toggle="button">On</button>-->
           {%- else -%}
              <span class="neighborhoodInfo hover"></span>

@@ -77,7 +77,7 @@ var MapPage = Backbone.View.extend({
   },
 
   setCurrentNeighborhoodName: function(name) {
-    $('.neighborhoodInfo').html(name);
+    // $('.neighborhoodInfo').html(name);
   },
 
   recolorNeighborhoods: function() {
@@ -654,6 +654,8 @@ var MapPage = Backbone.View.extend({
         this.centered = true;
       } 
       this.colorNeighborhoodFeature(feature, layer); 
+      
+      layer.bindLabel(feature.properties.label);
 
       layer.on('mouseover', _.bind(function(e) {
         $('.neighborhoodControls').addClass('hover');
