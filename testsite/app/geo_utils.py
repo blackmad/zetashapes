@@ -13,7 +13,12 @@ from itertools import groupby
 from shapely.ops import cascaded_union
 from shapely.geometry import mapping, asShape
 from shapely import speedups
+import shapely
+import shapely.geometry
 import vote_utils
+from shapely.ops import transform
+from functools import partial
+import pyproj
 
 state_codes = {
     'WA': '53', 'DE': '10', 'DC': '11', 'WI': '55', 'WV': '54', 'HI': '15',
@@ -96,20 +101,52 @@ def getNeighborhoodsByArea(conn, areaid, user):
     pop10 = sum([block['pop10'] for block in blocks])
     housing10 = sum([block['housing10'] for block in blocks])
 
-    hoods[id] = NeighborhoodArea(cascaded_union(geoms), blockids, pop10, housing10)
+    geom = cascaded_union(geoms)
+    hoods[id] = NeighborhoodArea(geom, blockids, pop10, housing10)
   return (hoods, id_to_label)
+
+def reproject(latlngs):
+    """Returns the x & y coordinates in meters using a sinusoidal projection"""
+    from math import pi, cos, radians
+    earth_radius = 6371009 # in meters
+    lat_dist = pi * earth_radius / 180.0
+    y = [ll[0] * lat_dist for ll in latlngs]
+    x = [long * lat_dist * cos(radians(lat)) 
+                for lat, long in latlngs]
+    return x, y
+
+def area_of_polygon(x, y):
+    """Calculates the area of an arbitrary polygon given its verticies"""
+    area = 0.0
+    for i in xrange(-1, len(x)-1):
+        area += x[i] * (y[i+1] - y[i-1])
+    return abs(area) / 2.0
+
+def area_of_shape(shape):
+  (x, y) = reproject([(ll[1], ll[0]) for ll in shape.exterior.coords])
+  return area_of_polygon(x, y)
 
 def getNeighborhoodsGeoJsonByArea(conn, areaid, user):
   (hoods, id_to_label) = getNeighborhoodsByArea(conn, areaid, user)
   neighborhoods = []
 
   for (id, nhoodarea) in hoods.iteritems():
+    shape = nhoodarea.shape
+    area_m = 0
+    if type(shape) == shapely.geometry.Polygon: 
+      area_m = area_of_shape(shape)
+    elif type(shape) == shapely.geometry.MultiPolygon: 
+      area_m = sum([area_of_shape(s) for s in shape.geoms])
+    else:
+      print 'unkown shape type: ' + type(shape)
+
     geojson = { 
       'type': 'Feature',
       'properties': {
         'id': id,
+        'area_m': area_m,
         'label': id_to_label[id],
-        'blockids': nhoodarea.blockids,
+        'blockids': ','.join(nhoodarea.blockids),
         'pop10': nhoodarea.pop10,
         'housing10': nhoodarea.housing10
       },

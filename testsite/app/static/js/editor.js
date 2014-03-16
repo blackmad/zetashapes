@@ -734,14 +734,14 @@ var MapPage = Backbone.View.extend({
     this.debugLog('labeling blocks');
     _.each(this.neighborhoodGeoJson_.features, _.bind(function(f) {
       var me = this;
-      _.each(f.properties.blockids, function(bid) {
+      _.each(f.properties.blockids.split(','), function(bid) {
         var block = me.idToFeatureMap_[bid];
         if (block) {
           block.properties['hoodId'] = f.properties.id;
         } else {
           this.debugLog('no block for ' + bid);
         }
-      })
+      }, this);
     }, this));
   },
 
