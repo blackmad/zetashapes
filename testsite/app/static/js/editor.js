@@ -102,7 +102,7 @@ var MapPage = Backbone.View.extend({
     $('.polygonModeAction').html(m);
 
     if (m == 'redraw') {
-      _.each(this.lastHighlightedNeighborhood_.feature.properties.blockids, _.bind(function(id) {
+      _.each(this.lastHighlightedNeighborhood_.feature.properties.blockids_array, _.bind(function(id) {
         var layer = this.idToLayerMap_[id];
         this.forceBlockLayerUnVote(layer);
       }, this));
@@ -407,7 +407,7 @@ var MapPage = Backbone.View.extend({
         this.lastHighlightedNeighborhood_.feature, 
         this.lastHighlightedNeighborhood_.layer
       );
-      var hoodId = this.lastHighlightedNeighborhood_.feature['properties']['id']
+      var hoodId = this.lastHighlightedNeighborhood_.feature['properties']['id'];
       if (this.lastHighlightedNeighborhood_.feature['properties']['needsAdd']) {
         this.doAdd();
       } else {
@@ -452,7 +452,7 @@ var MapPage = Backbone.View.extend({
     var hoodId = this.lastHighlightedNeighborhood_.feature['properties']['id']
     this.blockLayer_.setStyle(this.lightStyle);
 
-    _.each(this.lastHighlightedNeighborhood_.feature.properties.blockids, _.bind(function(id) {
+    _.each(this.lastHighlightedNeighborhood_.feature.properties.blockids_array, _.bind(function(id) {
       var layer = this.idToLayerMap_[id];
       this.colorBlock(layer);
     }, this));
@@ -690,6 +690,12 @@ var MapPage = Backbone.View.extend({
    
   onEachNeighborhoodFeature: function(feature, layer) {
       layer.feature = feature;
+
+      if ('blockids' in feature['properties']) {
+        feature['properties']['blockids_array'] = feature['properties']['blockids'].split(',');
+        delete feature['properties']['blockids'];
+      }
+
       this.neighborhoodIdToLayerMap_[feature.properties.id] = layer;
       if (!this.centered) {
         this.debugLog(feature);
@@ -734,7 +740,7 @@ var MapPage = Backbone.View.extend({
     this.debugLog('labeling blocks');
     _.each(this.neighborhoodGeoJson_.features, _.bind(function(f) {
       var me = this;
-      _.each(f.properties.blockids.split(','), function(bid) {
+      _.each(f.properties.blockids_array, function(bid) {
         var block = me.idToFeatureMap_[bid];
         if (block) {
           block.properties['hoodId'] = f.properties.id;
@@ -763,7 +769,7 @@ var MapPage = Backbone.View.extend({
     
     modal.find('.reassignButton').click(_.bind(function() {
       var voteString = 
-        _.map(this.lastHighlightedNeighborhood_.feature.properties.blockids, function(blockid) {
+        _.map(this.lastHighlightedNeighborhood_.feature.properties.blockids_array, function(blockid) {
           var votes = [blockid, this.lastHighlightedNeighborhood_.feature.properties.id, '-1'].join(',') + ';' +
             [blockid, select.val(), '1'].join(',');
           return votes;
@@ -777,7 +783,7 @@ var MapPage = Backbone.View.extend({
 
     modal.find('.deleteHoodButton').click(_.bind(function() {
       var voteString = 
-        _.map(this.lastHighlightedNeighborhood_.feature.properties.blockids, function(blockid) {
+        _.map(this.lastHighlightedNeighborhood_.feature.properties.blockids_array, function(blockid) {
           return [blockid, this.lastHighlightedNeighborhood_.feature.properties.id, '-1'].join(',');
         }, this).join(';')
      
