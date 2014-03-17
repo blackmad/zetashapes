@@ -38,7 +38,6 @@ def getPostgresConnection():
       host = hostname
   )
 
-
 def jsonify(*args, **kwargs):
   return current_app.response_class(json.dumps(dict(*args, **kwargs), indent=None), mimetype='application/json')
 
@@ -144,8 +143,8 @@ def citydata():
 
   return jsonify(response)
 
-def getNeighborhoodsByArea(conn, areaid, user):
-  neighborhoods = geo_utils.getNeighborhoodsGeoJsonByArea(conn, areaid, user)
+def getNeighborhoodsByAreas(conn, areaids, user):
+  neighborhoods = geo_utils.getNeighborhoodsGeoJsonByAreas(conn, areaids, user)
   
   response = {
     "type": "FeatureCollection",
@@ -156,19 +155,19 @@ def getNeighborhoodsByArea(conn, areaid, user):
   
   intent = request.args.get('intent', None)
   if intent == 'download':
-    jresponse.headers['Content-Disposition'] = 'attachment; filename=%s.geojson' % areaid
+    jresponse.headers['Content-Disposition'] = 'attachment; filename=%s.geojson' % '-'.join(areaids)
   # print jresponse
 
   return jresponse
 
 @app.route('/api/neighborhoodsByArea', methods=['GET'])
 @support_jsonp
-def neighborhoodsByArea():
+def neighborhoodsByAreas():
   conn = getPostgresConnection()
-  areaid = request.args.get('areaid', False)
+  areaids = request.args.get('areaid', '').split(',')
   apikey = request.args.get('key', '')
   user = findUserByApiKey(conn, apikey)
-  return getNeighborhoodsByArea(conn, areaid, user)
+  return getNeighborhoodsByAreas(conn, areaids, user)
 
 @app.route('/api/nearbyAreas')
 @support_jsonp

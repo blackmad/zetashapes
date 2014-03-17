@@ -128,27 +128,38 @@ def getVotesForBlocks(conn, blockids, user):
     addUserVotes(cur.fetchall(), votes)
   return votes
 
-def getVotes(conn, areaid, user): 
+def getVotes(conn, areaids, user): 
   cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
-  statefp10 = areaid[0:2]
-  countyfp10 = areaid[2:]
-  if not areaid:
+  areaid_clauses = []
+  for areaid in areaids:
+    statefp10 = areaid[0:2]
+    countyfp10 = areaid[2:]
+    areaid_clauses.append(cur.mogrify("statefp10 = %s AND countyfp10 = %s", (statefp10, countyfp10)))
+
+  if not areaids:
     raise Exception("uh, missing areaid???")
   print areaid
 
   print 'getting blocks with geoms'
-  cur.execute("""select geoid10, pop10, housing10, ST_AsGeoJSON(ST_Transform(geom, 4326)) as geojson_geom FROM tabblock2010_pophu tb WHERE statefp10 = %s AND countyfp10 = %s AND blockce10 NOT LIKE '0%%'""", (statefp10, countyfp10))
+  cur.execute("""select geoid10, pop10, housing10, ST_AsGeoJSON(ST_Transform(geom, 4326)) as geojson_geom FROM tabblock2010_pophu tb WHERE (""" + ' OR '.join(areaid_clauses) + """) AND blockce10 NOT LIKE '0%%'""", (statefp10, countyfp10))
   rows = cur.fetchall()
   print 'got'
 
+
   print 'getting votes'
-  print ("""select woe_id, id, label, count, v.source, name FROM """ + VOTES_TABLE + """ v JOIN geoplanet_places ON label::int = woe_id WHERE id LIKE '%s%%'""" % (areaid))
-  cur.execute("""select woe_id, id, label, count, v.source, name FROM """ + VOTES_TABLE + """ v JOIN geoplanet_places ON label::int = woe_id WHERE id LIKE '%s%%'""" % (areaid))
+  id_clauses = []
+  for areaid in areaids:
+    id_clauses.append("id LIKE '%s%%'" % areaid)
+  cur.execute("""select woe_id, id, label, count, v.source, name FROM """ + VOTES_TABLE + """ v JOIN geoplanet_places ON label::int = woe_id WHERE """ + ' OR '.join(id_clauses))
   globalVotes = cur.fetchall()
   print 'got'
 
   votes = buildVoteDict(globalVotes)
+
+  id_clauses = []
+  for areaid in areaids:
+    id_clauses.append("v.blockid LIKE '%s%%'" % areaid)
 
   user_votes = {}
   print 'user? %s' % user
@@ -156,7 +167,7 @@ def getVotes(conn, areaid, user):
   if user:
     userId = user['id']
     print 'getting user votes'
-    cur.execute("""select g.woe_id, blockid, name, weight FROM """ + USER_VOTES_TABLE + """ v JOIN geoplanet_places g ON v.woe_id = g.woe_id WHERE v.userid = %s AND v.blockid LIKE '%s%%' ORDER BY g.woe_id, ts ASC""" % (userId, areaid))
+    cur.execute("""select g.woe_id, blockid, name, weight FROM """ + USER_VOTES_TABLE + """ v JOIN geoplanet_places g ON v.woe_id = g.woe_id WHERE v.userid = %s """ % userId + """ AND (""" + ' OR '.join(id_clauses) + """) ORDER BY g.woe_id, ts ASC""")
     print 'got'
     addUserVotes(cur.fetchall(), votes)
     

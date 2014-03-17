@@ -77,9 +77,9 @@ def getInfoForNearbyAreaIds(conn, areaids):
     return []
 
 NeighborhoodArea = namedtuple('NeighborhoodArea', ['shape', 'blockids', 'pop10', 'housing10'])
-def getNeighborhoodsByArea(conn, areaid, user):
+def getNeighborhoodsByAreas(conn, areaids, user):
   print 'getting votes'
-  (blocks, allVotes) = vote_utils.getVotes(conn, areaid, user)
+  (blocks, allVotes) = vote_utils.getVotes(conn, areaids, user)
   print 'got votes'
 
   blocks_by_hoodid = defaultdict(list)
@@ -126,8 +126,8 @@ def area_of_shape(shape):
   (x, y) = reproject([(ll[1], ll[0]) for ll in shape.exterior.coords])
   return area_of_polygon(x, y)
 
-def getNeighborhoodsGeoJsonByArea(conn, areaid, user):
-  (hoods, id_to_label) = getNeighborhoodsByArea(conn, areaid, user)
+def getNeighborhoodsGeoJsonByAreas(conn, areaids, user):
+  (hoods, id_to_label) = getNeighborhoodsByAreas(conn, areaids, user)
   neighborhoods = []
 
   for (id, nhoodarea) in hoods.iteritems():
