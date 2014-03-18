@@ -382,7 +382,8 @@ def applyIncomingVotes(conn, user, votepairs):
     # bulk insert these
   print 'doing insert'
   cur.execute("""INSERT INTO """ + vote_utils.USER_VOTES_TABLE + """ (userid, blockid, woe_id, weight, ts) values %s""" % (', '.join(user_votes_to_insert)))
-  cur.execute("""INSERT INTO  """ + vote_utils.VOTES_TABLE + """ (id, label, count, source) values %s""" % (', '.join(votes_to_insert)))
+  if votes_to_insert:
+    cur.execute("""INSERT INTO  """ + vote_utils.VOTES_TABLE + """ (id, label, count, source) values %s""" % (', '.join(votes_to_insert)))
   conn.commit()
       
   # possible logic from up there
