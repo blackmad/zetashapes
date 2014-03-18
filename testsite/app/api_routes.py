@@ -393,4 +393,4 @@ def applyIncomingVotes(conn, user, votepairs):
   # existing user votes row should exist, so just decrement it
 
   print 'returning'
-  return getNeighborhoodsByArea(conn, votepairs[0].blockid[0:5], user)
+  return getNeighborhoodsByAreas(conn, votepairs[0].blockid[0:5], user)
