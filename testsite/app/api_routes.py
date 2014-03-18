@@ -394,5 +394,5 @@ def applyIncomingVotes(conn, user, votepairs):
   # --ugh, see if there's an existing user votes row for new block, if there is, increment it, if not, create it
   # existing user votes row should exist, so just decrement it
 
-  print 'returning'
-  return getNeighborhoodsByAreas(conn, votepairs[0].blockid[0:5], user)
+  areaids = set([vp.blockid[0:5] for vp in votepairs])
+  return getNeighborhoodsByAreas(conn, areaids, user)
