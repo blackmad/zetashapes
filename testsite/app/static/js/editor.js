@@ -182,6 +182,7 @@ var MapPage = Backbone.View.extend({
 			onEachFeature: _.bind(this.onEachNeighborhoodFeature, this)
 		}).addTo(this.map_);
     this.neighborhoodLayer_.on('click', _.bind(this.processNeighborhoodClick, this));
+    this.neighborhoodLayer_.on('dblclick', _.bind(this.processNeighborhoodDoubleClick, this));
 
     $('.helpButton').click(function() {
       $('#helpModal').modal();
@@ -779,8 +780,6 @@ var MapPage = Backbone.View.extend({
       if (this.neighborhoodsLoaded_) {
         this.labelBlocks();
       }
-      this.neighborhoodLayer_.on('click', _.bind(this.processNeighborhoodClick, this));
-      this.neighborhoodLayer_.on('dblclick', _.bind(this.processNeighborhoodDoubleClick, this));
 
       this.neighborhoodLayer_.fire('data:loaded');
       $('.controls').toggleClass('loading loaded');
