@@ -23,6 +23,21 @@ import geo_utils
 import vote_utils
 import sqlalchemy.pool as pool
 
+def getPostgresConnection():
+  print app.config['SQLALCHEMY_DATABASE_URI']
+  import urlparse
+  result = urlparse.urlparse(app.config['SQLALCHEMY_DATABASE_URI'])
+  username = result.username
+  password = result.password
+  database = result.path[1:]
+  hostname = result.hostname
+  return psycopg2.connect(
+      database = database,
+      user = username,
+      password = password,
+      host = hostname
+  )
+
 def jsonify(*args, **kwargs):
   return current_app.response_class(json.dumps(dict(*args, **kwargs), indent=None), mimetype='application/json')
 
@@ -32,7 +47,6 @@ if speedups.available:
 
 # start using sqlalchemy cursor, models etc, please
 psycopg2 = pool.manage(psycopg2)
-
 
 def support_jsonp(f):
     """Wraps JSONified output for JSONP"""
@@ -64,7 +78,7 @@ def makeFeatures(rows, voteDict, user):
 @app.route('/api/stateCounts', methods=['GET'])
 @support_jsonp
 def stateCounts():
-  conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
+  conn = getPostgresConnection()
   cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
   cur.execute("""select areaid, count, name10  FROM area_counts JOIN tl_2010_us_state10 ON areaid = geoid10 where char_length(areaid) = 2""")
   rows = cur.fetchall()
@@ -76,10 +90,46 @@ def stateCounts():
     }
   return jsonify(ret)
 
+
+@app.route('/api/addHood', methods=['POST', 'GET'])
+@support_jsonp
+def addHood():
+  conn = getPostgresConnection()
+  cur = conn.cursor()
+  print request.args
+  apikey = request.args.get('key', '')
+  user = findUserByApiKey(conn, apikey)
+
+  label = request.args.get('label', '')
+  print label
+  parentid = request.args.get('parentid', '')
+  if not label:
+    raise Exception('no label specified')
+  if not parentid:
+    raise Exception('no parentid specified')
+
+# check if we already have it
+  cur.execute("select woe_id FROM geoplanet_places where parent_id=%s AND name=%s", (parentid, label))
+  rows = cur.fetchall()
+  if len(rows) > 0:
+    hoodId = rows[0][0]
+    print 'had already %s' % hoodId
+  else:
+    cur.execute("insert into geoplanet_places values ((select max(woe_id) FROM geoplanet_places) + 1, 'US', %s, 'en', 'Suburb', %s, %s) RETURNING woe_id", (label, parentid, str(user['id'])))
+    conn.commit()
+    hoodId = cur.fetchone()[0]
+  
+  blockids = [b for b in request.args.get('blockids', '').split(',') if b]
+  votepairs = [IncomingBlockVote(blockId, hoodId, 1) for blockId in blockids]
+
+  resp = applyIncomingVotes(conn, user, votepairs)
+  print resp
+  return resp
+
 @app.route('/api/blocksByGeom', methods=['GET'])
 @support_jsonp
 def blocksByArea():
-  conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
+  conn = getPostgresConnection()
   cur = conn.cursor()
 
   ll = request.args.get('ll', False)
@@ -96,11 +146,11 @@ def blocksByArea():
 @app.route('/api/blocksByArea', methods=['GET'])
 @support_jsonp
 def citydata():
-  conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
+  conn = getPostgresConnection()
   areaid = request.args.get('areaid', False)
   apikey = request.args.get('key', '')
 
-  user = findUserByApiKey(apikey)
+  user = findUserByApiKey(conn, apikey)
   (rows, votes) = vote_utils.getVotes(conn, areaid, user)
 
   response = {
@@ -110,9 +160,8 @@ def citydata():
 
   return jsonify(response)
 
-def getNeighborhoodsByArea(areaid, user):
-  conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
-  neighborhoods = geo_utils.getNeighborhoodsGeoJsonByArea(conn, areaid, user)
+def getNeighborhoodsByAreas(conn, areaids, user):
+  neighborhoods = geo_utils.getNeighborhoodsGeoJsonByAreas(conn, areaids, user)
   
   response = {
     "type": "FeatureCollection",
@@ -123,34 +172,48 @@ def getNeighborhoodsByArea(areaid, user):
   
   intent = request.args.get('intent', None)
   if intent == 'download':
-    jresponse.headers['Content-Disposition'] = 'attachment; filename=%s.json' % areaid
+    jresponse.headers['Content-Disposition'] = 'attachment; filename=%s.geojson' % '-'.join(areaids)
   # print jresponse
 
   return jresponse
 
 @app.route('/api/neighborhoodsByArea', methods=['GET'])
 @support_jsonp
-def neighborhoodsByArea():
-  conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
-  areaid = request.args.get('areaid', False)
+def neighborhoodsByAreas():
+  conn = getPostgresConnection()
+  areaids = request.args.get('areaid', '').split(',')
   apikey = request.args.get('key', '')
-  user = findUserByApiKey(apikey)
-  return getNeighborhoodsByArea(areaid, user)
+  user = findUserByApiKey(conn, apikey)
+  return getNeighborhoodsByAreas(conn, areaids, user)
+
+@app.route('/api/nearbyAreas')
+@support_jsonp
+def nearbyAreaInfo():
+  conn = getPostgresConnection()
+  areaid = request.args.get('areaid', '').split(',')
+  nearbyAreaInfos = geo_utils.getInfoForNearbyAreaIds(conn, areaid)
+  return jsonify({'areas': nearbyAreaInfos})
 
 @app.route('/api/areaInfo')
 @support_jsonp
 def areaInfo():
-  conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
+  conn = getPostgresConnection()
   areaid = request.args.get('areaid', '').split(',')
   areaInfos = geo_utils.getInfoForAreaIds(conn, areaid)
+
+  for info in areaInfos:
+    areaid = info['areaid']
+    info['neighborhoods'] = getLabelsByArea(conn, areaid)
+    info['cities'] = getCitiesByArea(conn, areaid)
+
   return jsonify({'areas': areaInfos})
 
 @app.route('/api/blockInfo')
 @support_jsonp
 def blockInfo():
   apikey = request.args.get('key', '')
-  user = findUserByApiKey(apikey)
-  conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
+  user = findUserByApiKey(conn, apikey)
+  conn = getPostgresConnection()
   blockids = request.args.get('blockid', '').split(',')
   voteDict = vote_utils.getVotesForBlocks(conn, blockids, user)
 
@@ -163,18 +226,13 @@ def blockInfo():
   
   return jsonify(responseDict)
 
-@app.route('/api/labels', methods=['GET'])
-@support_jsonp
-def labels():
-  conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
+def getLabelsByArea(conn, areaid):
   cur = conn.cursor()
-
-  areaid = request.args.get('areaid', False)
 
   statefp10 = areaid[0:2]
   countyfp10 = areaid[2:]
 
-  cur.execute("""select distinct(label, name) FROM votes v JOIN geoplanet_places ON label::int = woe_id WHERE id LIKE '%s%%'""" % (areaid))
+  cur.execute("""select distinct(label, name) FROM  """ + vote_utils.VOTES_TABLE + """ v JOIN geoplanet_places ON label::int = woe_id WHERE id LIKE '%s%%'""" % (areaid))
 
   rows = cur.fetchall()
 
@@ -186,13 +244,36 @@ def labels():
       id = m.group(1)
       label = m.group(2).replace('"', '')
       response.append({'id': id, 'label': label})
-      
+     
+  return response
+
+def getCitiesByArea(conn, areaid):
+  cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+
+  cur.execute("""select * FROM geoplanet_places WHERE placetype in ('Town', 'County') AND woe_id IN
+    (select distinct(parent_id) FROM  """ + vote_utils.VOTES_TABLE + """ v JOIN geoplanet_places ON label::int = woe_id WHERE id LIKE '%s%%')""" % (areaid))
+
+  rows = cur.fetchall()
+  response = []
+  for r in rows:
+    response.append({
+      'label': r['name'],
+      'id': r['woe_id'],
+      'placetype': r['placetype']
+    })
+  return response
+
+@app.route('/api/labels', methods=['GET'])
+@support_jsonp
+def labels():
+  conn = getPostgresConnection()
+  areaid = request.args.get('areaid', False)
+  response = getLabelsByArea(conn, areaid)
   return jsonify({'labels': response})
 
 # this should probably go through the user model? meh
-def findUserByApiKey(api_key):
+def findUserByApiKey(conn, api_key):
   if (api_key):
-    conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     cur.execute("""select * FROM users WHERE api_key=%s""",  (api_key,))
     return cur.fetchone()
@@ -200,9 +281,8 @@ def findUserByApiKey(api_key):
     return None
 
 def modifyUsersVoteCount(cur, userLevel, blockid, woeid, incr):
-  conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
-
-  cur.execute("""update votes SET count = count + %s WHERE label=%s AND id=%s""", (
+  print 'doing modify'
+  cur.execute("""update  """ + vote_utils.VOTES_TABLE + """ SET count = count + %s WHERE label=%s AND id=%s""", (
     incr, woeid, blockid
   ))
 
@@ -212,7 +292,7 @@ IncomingBlockVote = namedtuple('IncomingBlockVote', ['blockid', 'woe_id', 'weigh
 @app.route('/api/vote', methods=['POST', 'GET'])
 @support_jsonp
 def do_vote():
-  conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
+  conn = getPostgresConnection()
   cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
   votepairs = []
   formdata = request.form or request.args
@@ -240,27 +320,39 @@ def do_vote():
   #print votepairs
 
   apikey = formdata.get('key', '')
-  user = findUserByApiKey(apikey)
+  user = findUserByApiKey(conn, apikey)
+  return applyIncomingVotes(conn, user, votepairs)
+
+def applyIncomingVotes(conn, user, votepairs):
+  cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
   userId = user['id']
 
   if len(votepairs) == 0:
     return jsonify({})
 
-  comm = cur.mogrify("""select * FROM user_votes WHERE userid=%s AND blockid IN %s""", (
-    userId,
-    tuple([v[0] for v in votepairs])
-  ))
-  #print comm
-  cur.execute(comm)
+  blockids = tuple([v.blockid for v in votepairs])
 
-  rows = cur.fetchall()
-  #print rows
+  print 'fetching user votes'
+  rows = vote_utils.getUserVotesForBlocks(conn, userId, blockids)
+   #print rows
   existing_votes = defaultdict(list)
   for v in rows:
     existing_votes[v['blockid']].append(v)
   #print existing_votes
 
+  woe_ids = tuple([v.woe_id for v in votepairs])
+
+  print 'fetching votes'
+  cur.execute("""select id, COUNT(*) as c FROM """ + vote_utils.VOTES_TABLE + """ WHERE source='users' AND id IN %s AND label IN %s GROUP BY id""", (
+    blockids, woe_ids
+  ))
+
+  existingAggregatedVotes = { c['id']: c['c'] for c in cur.fetchall() }
+
+  user_votes_to_insert = []
+  votes_to_insert = []
   for vote in votepairs:
+    print 'dealing with %s' % (vote, )
     #print 'looking at label vote %s for block %s' % (vote.woe_id, vote.blockid)
     #print existing_votes[vote.blockid]
 
@@ -279,24 +371,28 @@ def do_vote():
         modifyUsersVoteCount(cur, user['level'], vote.blockid, existing_vote['woe_id'], -1*vote.weight)
 
     if not already_had_vote:
-      cur.execute("""select COUNT(*) as c FROM votes WHERE source='users' AND id=%s AND label=%s""", (
-        vote.blockid, vote.woe_id
-      ))
-      if cur.fetchone()['c'] > 0:
+      if vote.blockid in existingAggregatedVotes:
         # we have an existing row to increment
         modifyUsersVoteCount(cur, user['level'], vote.blockid, vote.woe_id, vote.weight)
       else:
         #print 'trying to insert'
-        cur.execute("""INSERT INTO votes (id, label, count, source) values (%s, %s, %s, 'users')""", (
-          vote.blockid, vote.woe_id, vote.weight))
-    
-      cur.execute("""INSERT INTO user_votes (userid, blockid, woe_id, weight, ts) values (%s, %s, %s, %s, 'now')""", (
-        userId, vote.blockid, vote.woe_id, vote.weight))
-    conn.commit()
-        
-    # see if I have an existing vote on user_votes for this block
-    # if I do, and it's for the same woe_id, don't do anything
-    # if it's for a different block
-    # --ugh, see if there's an existing user votes row for new block, if there is, increment it, if not, create it
-    # existing user votes row should exist, so just decrement it
-  return getNeighborhoodsByArea(votepairs[0].blockid[0:5], user)
+        votes_to_insert.append(cur.mogrify("""(%s, %s, %s, 'users')""", (vote.blockid, vote.woe_id, vote.weight)))
+      user_votes_to_insert.append(cur.mogrify("""(%s, %s, %s, %s, 'now')""", (userId, vote.blockid, vote.woe_id, vote.weight)))
+
+    # bulk insert these
+  print 'doing insert'
+  if user_votes_to_insert:
+    cur.execute("""INSERT INTO """ + vote_utils.USER_VOTES_TABLE + """ (userid, blockid, woe_id, weight, ts) values %s""" % (', '.join(user_votes_to_insert)))
+  if votes_to_insert:
+    cur.execute("""INSERT INTO  """ + vote_utils.VOTES_TABLE + """ (id, label, count, source) values %s""" % (', '.join(votes_to_insert)))
+  conn.commit()
+      
+  # possible logic from up there
+  # see if I have an existing vote on user_votes for this block
+  # if I do, and it's for the same woe_id, don't do anything
+  # if it's for a different block
+  # --ugh, see if there's an existing user votes row for new block, if there is, increment it, if not, create it
+  # existing user votes row should exist, so just decrement it
+
+  areaids = set([vp.blockid[0:5] for vp in votepairs])
+  return getNeighborhoodsByAreas(conn, areaids, user)

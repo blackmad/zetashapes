@@ -24,6 +24,20 @@ import psycopg2
 import sqlalchemy.pool as pool
 psycopg2 = pool.manage(psycopg2)
 
+def getPostgresConnection():
+  import urlparse
+  result = urlparse.urlparse(app.config['SQLALCHEMY_DATABASE_URI'])
+  username = result.username
+  password = result.password
+  database = result.path[1:]
+  hostname = result.hostname
+  return psycopg2.connect(
+      database = database,
+      user = username,
+      password = password,
+      host = hostname
+  )
+
 
 @app.route('/api/test')
 def test():
@@ -31,7 +45,7 @@ def test():
 
 @app.route('/')
 def index():
-    conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
+    conn = getPostgresConnection()
     print request.remote_addr
     areas = []
     if request.access_route:
@@ -118,14 +132,13 @@ def register(provider_id=None):
 @app.route('/profile')
 @login_required
 def profile():
-    conn = psycopg2.connect("dbname='gis' user='blackmad' host='localhost' password='xxx'")
+    conn = getPostgresConnection()
     areaids = vote_utils.getAreaIdsForUserId(conn, current_user.id)
     areas = geo_utils.getInfoForAreaIds(conn, areaids)
     return render_template('profile.html',
         areas=areas,
         twitter_conn=current_app.social.twitter.get_connection(),
         facebook_conn=current_app.social.facebook.get_connection(),
-        github_conn=current_app.social.github.get_connection(),
         foursquare_conn=current_app.social.foursquare.get_connection(),
         google_conn=current_app.social.google.get_connection()
     )

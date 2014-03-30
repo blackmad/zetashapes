@@ -9,6 +9,17 @@ function cloneLatLng(ll) {
   return new L.LatLng(ll.lat, ll.lng);
 };
 
+$.parseParams = function(p){
+var ret = {},
+    seg = p.replace(/^\?/,'').split('&'),
+    len = seg.length, i = 0, s;
+for (;i<len;i++) {
+    if (!seg[i]) { continue; }
+    s = seg[i].split('=');
+    ret[s[0]] = s[1];
+}
+return ret;}
+
 var MapPage = Backbone.View.extend({
   debugLog: function(s) {
     if (this.debug_) {
@@ -65,6 +76,10 @@ var MapPage = Backbone.View.extend({
     this.$selectedNeighborhoodSpan.text(label);
   },
 
+  setCurrentNeighborhoodName: function(name) {
+    // $('.neighborhoodInfo').html(name);
+  },
+
   recolorNeighborhoods: function() {
     this.debugLog(this.neighborhoodIdToLayerMap_);
     _.each(this.neighborhoodIdToLayerMap_, _.bind(function(layer, id, list) {
@@ -87,7 +102,7 @@ var MapPage = Backbone.View.extend({
     $('.polygonModeAction').html(m);
 
     if (m == 'redraw') {
-      _.each(this.lastHighlightedNeighborhood_.feature.properties.blockids, _.bind(function(id) {
+      _.each(this.lastHighlightedNeighborhood_.feature.properties.blockids_array, _.bind(function(id) {
         var layer = this.idToLayerMap_[id];
         this.forceBlockLayerUnVote(layer);
       }, this));
@@ -127,31 +142,27 @@ var MapPage = Backbone.View.extend({
 
   initialize: function() {
     this.debug_ = false;
+    this.params_ = $.parseParams((window.location.search || window.location.hash).substring(1));
+    if (this.params_['debug']) {
+      this.debug_ = true;
+    }
+
     key('c', _.bind(function(){ this.toggleDrawMode('continuous', 'polygon') }, this));
     key('p', _.bind(function(){ this.toggleDrawMode('polygon', 'continous') }, this));
     key('r', _.bind(function(){ this.changePolygonMode('redraw') }, this));
     key('d', _.bind(function(){ this.changePolygonMode('delete') }, this));
     key('a', _.bind(function(){ this.changePolygonMode('add') }, this));
 
-    this.requestsOutstanding_ = 0;
-    this.neighborhoodsLoaded_ = false;
-    this.inBlockMode_ = false;
-    this.idToLayerMap_ = {}
-    this.idToFeatureMap_ = {}
-    this.inPolygonMode_ = false;
     this.$selectedNeighborhoodSpan = $('#selectedNeighborhood');
-    this.neighborhoodIdToLayerMap_ = {};
- 
-    this.blockLayer_ = L.geoJson(null, {
-			onEachFeature: _.bind(this.onEachBlockFeature, this)
-		});     
-
-    this.blocksLoaded_ = false;
+    this.blockAreasLoaded_ = {}
 
     this.labelColors_ = {};
     this.apiKey_ = this.options.api_key;
-    this.debugLog(this.options);
 
+    this.blockLayer_ = L.geoJson(null, {
+			onEachFeature: _.bind(this.onEachBlockFeature, this)
+		});     
+    
     this.map_= L.map('map', {dragging: true}).setView([40.74, -74], 13);
     var mapboxTilesAttr = 'Tiles &copy; <a href="http://www.mapbox.com/about/maps/">Mapbox</a>, Data &copy; OSM';
 
@@ -170,33 +181,111 @@ var MapPage = Backbone.View.extend({
 
 			onEachFeature: _.bind(this.onEachNeighborhoodFeature, this)
 		}).addTo(this.map_);
+    this.neighborhoodLayer_.on('click', _.bind(this.processNeighborhoodClick, this));
+    this.neighborhoodLayer_.on('dblclick', _.bind(this.processNeighborhoodDoubleClick, this));
+
+    $('.helpButton').click(function() {
+      $('#helpModal').modal();
+    });
+
+    this.initHelper(true);
+
+    $('.downloadLink').click(_.bind(function(e) {
+      var link = "/api/neighborhoodsByArea?areaid=" + this.areaid.join(',')
+      if (this.apiKey_) {
+        link += "&key=" + this.apiKey_ + "&intent=download";
+      }
+      window.open(window.location.protocol + "//" + window.location.host + link);
+      e.preventDefault();
+    }, this));
+  },
+
+  initHelper: function(loadNearby) {
+    this.requestsOutstanding_ = 0;
+    this.neighborhoodsLoaded_ = false;
+    this.inBlockMode_ = false;
+    this.idToLayerMap_ = {}
+    this.idToFeatureMap_ = {}
+    this.inPolygonMode_ = false;
+    this.neighborhoodIdToLayerMap_ = {};
+    this.addHoodTempId_ = -1;
+ 
+    this.blocksLoaded_ = false;
+
+    this.debugLog(this.options); 
     this.neighborhoodLayer_.fire('data:loading');
 
     if (this.options.geojson) {
       this.renderData(this.options.geojson);
     } else {
       this.fetchData(this.options.areaid);
+      if (loadNearby && this.apiKey_) {
+        this.fetchNearbyData(this.options.areaid);
+      }
     }
-
-    $('.helpButton').click(function() {
-      $('#helpModal').modal();
-    })
   },
 
   renderAreaInfo: function(data) {
     this.debugLog('made it to areainfo')
     this.debugLog(data)
     this.map_.fitBounds(L.geoJson(data.areas[0].bbox).getBounds());
+    this.updateStatus('Loading blocks ...')
+    this.neighborhoodLabels_ = data.areas[0].neighborhoods;
+    this.cityLabels_ = data.areas[0].cities;
     this.centered = true;
   },
 
-  fetchData: function(areaid) {
-    this.debugLog('fetching ' + areaid)
+  renderNearbyAreaInfo: function(data) {
+    this.debugLog('made it to areainfo')
+    this.debugLog(data)
+    _.each(data.areas, function(area) {
+        var geom = L.geoJson(area.geom);
+        geom.bindLabel('Click to load ' + area.displayName);
+        this.map_.addLayer(geom);
+
+        var mouseOverCb = function(e) {
+          geom.setStyle(this.grayStyleHover);
+        }
+        var mouseOutCb = function(e) {
+          geom.setStyle(this.grayStyle);
+        }
+        geom.setStyle(this.grayStyle);
+        var clickCb = function(e) {
+          this.options.areaid = this.options.areaid + ',' + area.areaid;
+          e.layer.remove(e.layer.feature);
+          this.initHelper(false);
+        }
+
+        geom.on('mouseover', _.bind(mouseOverCb, this));
+        geom.on('mouseout', _.bind(mouseOutCb, this))
+        geom.on('click', _.bind(clickCb, this))
+
+    }, this);
+  },
+
+  fetchNearbyData: function(areaid) {
+   this.debugLog('fetching ' + areaid)
     $.ajax({
       dataType: 'json',
-      url: '/static/json/info-' + areaid + '.json',
-      success: _.bind(this.renderAreaInfo, this)
+      url: '/api/nearbyAreas?callback=?',
+      data: {
+        'areaid': areaid
+      },
+      success: _.bind(this.renderNearbyAreaInfo, this)
     })
+  },
+
+  fetchData: function(areaid) {
+    this.debugLog('fetching ' + areaid);
+    $.ajax({
+      dataType: 'json',
+      // url: '/static/json/info-' + areaid + '.json',
+      url: '/api/areaInfo?callback=?',
+      data: {
+        'areaid': areaid
+      },
+      success: _.bind(this.renderAreaInfo, this)
+    }); 
 
     this.requestsOutstanding_ += 1
     $.ajax({
@@ -210,24 +299,30 @@ var MapPage = Backbone.View.extend({
     })
 
    if (this.apiKey_) {
-     this.requestsOutstanding_ += 1;
      var object = {}
      this.blockLoader_ = _.extend(object, Backbone.Events);
-      $.ajax({
-        dataType: 'json',
-        url: '/static/json/' + areaid + '.json',
-        data: {
-          areaid: areaid,
-          key: this.apiKey_,
-        },
-        success: _.bind(this.cacheBlockData, this)
-      })
-   } else {
-    this.neighborhoodLayer_.on('click', _.bind(this.processNeighborhoodClick, this));
+      _.each(areaid.split(','), function(a) {
+        if (!this.blockAreasLoaded_[areaid]) {
+          this.blockAreasLoaded_[areaid];
+          this.requestsOutstanding_ += 1;
+          $.ajax({
+            dataType: 'json',
+            url: '/static/json/' + a + '.json',
+            data: {
+              areaid: a,
+              key: this.apiKey_,
+            },
+            success: _.bind(this.cacheBlockData, this)
+          })
+        }
+      }, this);
    }
   },
 
   colorNeighborhoodFeature: function(feature, layer, opacity) {
+    if (!layer) {
+      return;
+    }
     if (this.inBlockMode_) {
       layer.setStyle(this.clearStyle);
     } else {
@@ -293,36 +388,65 @@ var MapPage = Backbone.View.extend({
     }
   },
 
+  doVote: function(voteString) {
+    if (voteString) {
+      $.ajax({
+        dataType: 'json',
+        url: '/api/vote',
+        type: 'POST',
+        data: { 
+          key: this.apiKey_,
+          votes: voteString
+        },
+        success: _.bind(this.updateHoods, this)
+      });
+    }
+  },
+
+  doAdd: function() {
+    var blockIds = _.map(this.clickedBlocks_, function(b){ return b.properties.id });
+    var cityId = this.lastHighlightedNeighborhood_.feature['properties']['city'];
+    var hoodLabel =  this.lastHighlightedNeighborhood_.feature['properties']['label'];
+    
+    if (blockIds) {
+      $.ajax({
+          dataType: 'json',
+          url: '/api/addHood',
+          type: 'POST',
+          data: { 
+            key: this.apiKey_,
+            label: hoodLabel,
+            parentid: cityId,
+            blockids: blockIds.join(',')
+          },
+          success: _.bind(this.updateHoods, this)
+        });
+    }
+  },
+
   exitBlockMode: function(vote) {
     $('.controls').toggleClass('blockMode neighborhoodMode');
     this.inBlockMode_ = false;
     this.hideBlocks();
-    //this.map_.removeLayer(this.blockLayer_);
-    //this.map_.addLayer(this.neighborhoodLayer_);
 
     if (vote) {
-      // go through clicked blocks
-      this.colorNeighborhoodFeature(this.lastHighlightedNeighborhood_.feature, this.lastHighlightedNeighborhood_.layer);
-      var hoodId = this.lastHighlightedNeighborhood_.feature['properties']['id']
-      var voteString = _.map(this.clickedBlocks_, function(feature) {
-        if (!feature.properties.hoodId) {
-          return feature.properties.id + ',' + hoodId + ',-1';
-        } else {
-          return feature.properties.id + ',' + hoodId + ',1';
-        }
-      }).join(';')
-     
-      if (voteString) {
-        $.ajax({
-          dataType: 'json',
-          url: '/api/vote',
-          type: 'POST',
-          data: { 
-            key: this.apiKey_,
-            votes: voteString
-          },
-          success: _.bind(this.updateHoods, this)
-        });
+      this.colorNeighborhoodFeature(
+        this.lastHighlightedNeighborhood_.feature, 
+        this.lastHighlightedNeighborhood_.layer
+      );
+      var hoodId = this.lastHighlightedNeighborhood_.feature['properties']['id'];
+      if (this.lastHighlightedNeighborhood_.feature['properties']['needsAdd']) {
+        this.doAdd();
+      } else {
+        var voteString = _.map(this.clickedBlocks_, function(feature) {
+          if (!feature.properties.hoodId) {
+            return feature.properties.id + ',' + hoodId + ',-1';
+          } else {
+            return feature.properties.id + ',' + hoodId + ',1';
+          }
+        }).join(';')
+       
+        this.doVote(voteString); 
       }
     } else {
       _.each(this.clickedBlocks_, function(feature) {
@@ -348,16 +472,20 @@ var MapPage = Backbone.View.extend({
     this.inBlockMode_ = true;
     this.clickedBlocks_ = [];
     // swap in the block layer
-    this.map_.fitBounds(this.lastHighlightedNeighborhood_.layer.getBounds());
+    if (this.lastHighlightedNeighborhood_.layer) {
+      this.map_.fitBounds(this.lastHighlightedNeighborhood_.layer.getBounds());
+    }
     this.debugLog(this.lastHighlightedNeighborhood_.feature['properties']);
     var hoodId = this.lastHighlightedNeighborhood_.feature['properties']['id']
     this.blockLayer_.setStyle(this.lightStyle);
 
-    _.each(this.lastHighlightedNeighborhood_.feature.properties.blockids, _.bind(function(id) {
+    _.each(this.lastHighlightedNeighborhood_.feature.properties.blockids_array, _.bind(function(id) {
       var layer = this.idToLayerMap_[id];
       this.colorBlock(layer);
     }, this));
-    this.lastHighlightedNeighborhood_.layer.setStyle(this.clearStyle);
+    if (this.lastHighlightedNeighborhood_.layer) {
+      this.lastHighlightedNeighborhood_.layer.setStyle(this.clearStyle);
+    }
   },
 
   enterBlockMode: function() {
@@ -390,6 +518,17 @@ var MapPage = Backbone.View.extend({
     color: 'white',
     fillColor: 'white',
     fillOpacity: 0.01
+  },
+
+  grayStyle : {
+    'weight': 0.5,
+    'fillOpacity': 0.0,
+    'color': 'gray'
+  },
+   grayStyleHover : {
+    'weight': 0.5,
+    'fillOpacity': 0.4,
+    'color': 'gray'
   },
 
   highlightBlockStyle: function(color) { return {
@@ -564,22 +703,24 @@ var MapPage = Backbone.View.extend({
     this.updateStatus('added block layer to map');
     this.hideBlocks();
     this.updateStatus('hiding block layer until later');
+    this.updateStatus('Reticulating Splines ...');
 
     this.blockLoader_.trigger('loaded');
-    // this.map_.boxZoom.disable();
-    if (this.neighborhoodsLoaded_) {
-      this.labelBlocks();
-    }
-    this.neighborhoodLayer_.on('click', _.bind(this.processNeighborhoodClick, this));
-    this.neighborhoodLayer_.on('dblclick', _.bind(this.processNeighborhoodDoubleClick, this));
+    
     this.requestDone();
   },
    
   onEachNeighborhoodFeature: function(feature, layer) {
       layer.feature = feature;
+
+      if ('blockids' in feature['properties']) {
+        feature['properties']['blockids_array'] = feature['properties']['blockids'].split(',');
+        delete feature['properties']['blockids'];
+      }
+
       this.neighborhoodIdToLayerMap_[feature.properties.id] = layer;
       if (!this.centered) {
-        window.this.debugLog(feature);
+        this.debugLog(feature);
         if (feature.geometry.type == "Polygon") {
           this.map_.panTo(new L.LatLng(feature.geometry.coordinates[0][0][1], feature.geometry.coordinates[0][0][0]));
         } else {
@@ -588,6 +729,8 @@ var MapPage = Backbone.View.extend({
         this.centered = true;
       } 
       this.colorNeighborhoodFeature(feature, layer); 
+      
+      layer.bindLabel(feature.properties.label);
 
       layer.on('mouseover', _.bind(function(e) {
         $('.neighborhoodControls').addClass('hover');
@@ -601,9 +744,7 @@ var MapPage = Backbone.View.extend({
         }
         this.debugLog(feature['properties']['id'] + ' mouse over ' + this.calculateColor(feature));
 
-        $('.neighborhoodInfo').html(
-          feature.properties.label
-        );
+        this.setCurrentNeighborhoodName(feature.properties.label);
       }, this));
 
       var mouseOutCb = function(e) {
@@ -621,14 +762,14 @@ var MapPage = Backbone.View.extend({
     this.debugLog('labeling blocks');
     _.each(this.neighborhoodGeoJson_.features, _.bind(function(f) {
       var me = this;
-      _.each(f.properties.blockids, function(bid) {
+      _.each(f.properties.blockids_array, function(bid) {
         var block = me.idToFeatureMap_[bid];
         if (block) {
           block.properties['hoodId'] = f.properties.id;
         } else {
           this.debugLog('no block for ' + bid);
         }
-      })
+      }, this);
     }, this));
   },
 
@@ -636,9 +777,147 @@ var MapPage = Backbone.View.extend({
     this.requestsOutstanding_--;
     this.debugLog(this.requestsOutstanding_)
     if (this.requestsOutstanding_ == 0) {
+      if (this.neighborhoodsLoaded_) {
+        this.labelBlocks();
+      }
+
       this.neighborhoodLayer_.fire('data:loaded');
       $('.controls').toggleClass('loading loaded');
     }
+  },
+
+  setupDeleteNeighborhoodModal: function() {
+    var modal = $('#neighborhoodDeleteModal');
+    var select = modal.find('.neighborhoodSelect');
+    _.each(_.sortBy(this.neighborhoodLabels_, function(l) { return l['label']; }), function(label) {
+      select.append($('<option>', { value: label['id'] }).text(label['label']));
+    });
+    
+    modal.find('.reassignButton').click(_.bind(function() {
+      var voteString = 
+        _.map(this.lastHighlightedNeighborhood_.feature.properties.blockids_array, function(blockid) {
+          var votes = [blockid, this.lastHighlightedNeighborhood_.feature.properties.id, '-1'].join(',') + ';' +
+            [blockid, select.val(), '1'].join(',');
+          return votes;
+        }, this).join(';');
+     
+      this.doVote(voteString); 
+
+      modal.modal('hide');
+      this.exitBlockMode(false);
+    }, this));
+
+    modal.find('.deleteHoodButton').click(_.bind(function() {
+      var voteString = 
+        _.map(this.lastHighlightedNeighborhood_.feature.properties.blockids_array, function(blockid) {
+          return [blockid, this.lastHighlightedNeighborhood_.feature.properties.id, '-1'].join(',');
+        }, this).join(';')
+     
+      this.doVote(voteString); 
+
+      modal.modal('hide');
+      this.exitBlockMode(false);
+    }, this));
+ 
+    modal.find('.closeButton').click(function() {
+      modal.modal('hide');
+    });
+  },
+
+  setupAddNeighborhoodModal: function() {
+    var modal = $('#neighborhoodAddModal');
+    
+    modal.find('.closeButton').click(function() {
+      modal.modal('hide');
+    });
+
+    modal.find('.addButton').click(_.bind(function() {
+      var neighborhoodMap = _.indexBy(this.neighborhoodLabels_, 'label')
+      var sel = modal.find('.hoodEntry');
+      var selectedHood = sel.val();
+      var hoodId = null
+      if (neighborhoodMap[selectedHood]) {
+        hoodId = neighborhoodMap[selectedHood]['id'];
+      }
+      var layer = this.neighborhoodIdToLayerMap_[hoodId];
+
+      if (!hoodId || !layer) {
+        var needsAdd = false;
+        if (hoodId == undefined) {
+          hoodId = this.addHoodTempId_;
+          needsAdd = true;
+        }
+
+        this.lastHighlightedNeighborhood_ = {
+          'feature': {
+            'properties': {
+              'label': selectedHood,
+              'id': hoodId,
+              'needsAdd': needsAdd,
+              'city': modal.find('.citySelect').val(),
+              'blockids': []
+            }
+          }
+        };
+        this.addHoodTempId_ -= 1;
+      } else {
+        this.lastHighlightedNeighborhood_ = {
+          'layer': layer,
+          'feature': layer.feature 
+        };
+      }
+      modal.modal('hide');
+      $('.controls').show();
+      this.setCurrentNeighborhoodName(selectedHood);
+      this.enterBlockMode();
+      return false;
+    }, this));
+
+    modal.on('hidden.bs.modal', function (e) {
+      $('.controls').show();
+    });
+  },
+
+  deleteNeighborhood: function() {
+    console.log('entering deleteNeighborhod')
+    console.log(this)
+    var modal = $('#neighborhoodDeleteModal');
+
+    modal.find('.neighborhoodName').html(
+      this.lastHighlightedNeighborhood_.feature.properties.label
+    );
+   
+    modal.modal()
+  },
+
+  addNeighborhood: function() {
+    console.log('entering addNeighborhod')
+    console.log(this)
+    $('.controls').hide();
+    var modal = $('#neighborhoodAddModal');
+
+    var hoodSelect = modal.find('.neighborhoodSelect');
+    _.each(_.sortBy(this.neighborhoodLabels_, function(l) { return l['label']; }), function(label) {
+      hoodSelect.append($('<option>', { value: label['id'] }).text(label['label']));
+    });
+
+    var sel = modal.find('.hoodEntry');
+    var neighborhoodMap = _.indexBy(this.neighborhoodLabels_, 'label')
+    var source = _.map(neighborhoodMap, function(c) { return c['label']; })
+    sel.typeahead({
+      source: source,
+      updater: function(selection){
+        console.log("You selected: " + selection)
+        return selection;
+      }
+    });
+
+    var citySelect = modal.find('.citySelect');
+    _.each(_.sortBy(this.cityLabels_, function(l) { return l['label']; }), function(label) {
+      citySelect.append($('<option>', { value: label['id'] }).text(label['label']));
+    });
+
+    modal.modal()
   },
 
   renderData: function(geojson) {
@@ -649,6 +928,12 @@ var MapPage = Backbone.View.extend({
     this.$polygonMode.click(_.bind(this.togglePolygonMode, this))
     $('.exitAndSaveBlockModeButton').click(_.bind(function() { this.exitBlockMode(true); }, this)); 
     $('.exitAndUndoBlockModeButton').click(_.bind(function() { this.exitBlockMode(false); }, this)); 
+    console.log('renderData');
+    $('.deleteButton').click(_.bind(function() { this.deleteNeighborhood(); }, this)); 
+    this.setupDeleteNeighborhoodModal();
+
+    $('.addButton').click(_.bind(function() { this.addNeighborhood(); }, this)); 
+    this.setupAddNeighborhoodModal();
 
     this.lastHighlightedNeighborhood_ = null;
     this.lastHighlightedBlocks_ = [];

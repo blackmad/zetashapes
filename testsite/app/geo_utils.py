@@ -13,7 +13,12 @@ from itertools import groupby
 from shapely.ops import cascaded_union
 from shapely.geometry import mapping, asShape
 from shapely import speedups
+import shapely
+import shapely.geometry
 import vote_utils
+from shapely.ops import transform
+from functools import partial
+import pyproj
 
 state_codes = {
     'WA': '53', 'DE': '10', 'DC': '11', 'WI': '55', 'WV': '54', 'HI': '15',
@@ -42,6 +47,8 @@ def areaInfo(rows):
     }
     if 'bbox' in r:
       d['bbox'] = json.loads(r['bbox'])
+    if 'geojson' in r:
+      d['geom'] = json.loads(r['geojson'])
     responses.append(d)
   return responses
 
@@ -60,52 +67,88 @@ def getInfoForAreaIds(conn, areaids):
   else:
     return []
 
-def getBlocks(conn, blockids):
-  if blockids:
+def getInfoForNearbyAreaIds(conn, areaids):
+  if areaids:
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    cur.execute("""select geoid10,ST_AsGeoJson(geom) as geojson FROM tabblock10 WHERE geoid10 IN %s""", (tuple(blockids),))
+    cur.execute("""select *,ST_AsGeoJson(c1.geom) as geojson, ST_AsGeoJson(ST_Envelope(c1.geom)) as bbox FROM tl_2010_us_county10 c1 JOIN (select geom FROM tl_2010_us_county10 WHERE geoid10 IN %s) c2 ON c1.geom && c2.geom WHERE geoid10 NOT IN %s""", (tuple(areaids), tuple(areaids)))
     rows = cur.fetchall()
-    d = {}
-    for r in rows:
-      d[r['geoid10']] = r['geojson']
-    return d
+    return areaInfo(rows)
   else:
-    return {}
+    return []
 
-NeighborhoodArea = namedtuple('NeighborhoodArea', ['shape', 'blockids'])
-def getNeighborhoodsByArea(conn, areaid, user):
-  (blocks, allVotes) = vote_utils.getVotes(conn, areaid, user)
+NeighborhoodArea = namedtuple('NeighborhoodArea', ['shape', 'blockids', 'pop10', 'housing10'])
+def getNeighborhoodsByAreas(conn, areaids, user):
+  print 'getting votes'
+  (blocks, allVotes) = vote_utils.getVotes(conn, areaids, user)
+  print 'got votes'
 
   blocks_by_hoodid = defaultdict(list)
-  blockids_by_hoodid = defaultdict(list)
   id_to_label = {}
 
   for block in blocks:
-    geom = asShape(eval(block['geojson_geom']))
     votes = allVotes[block['geoid10']]
     #print block['geoid10']
     maxVotes = vote_utils.pickBestVotes(votes)
     for maxVote in maxVotes:
-      blocks_by_hoodid[maxVote['id']].append(geom)
-      blockids_by_hoodid[maxVote['id']].append(block['geoid10'])
+      blocks_by_hoodid[maxVote['id']].append(block)
       id_to_label[maxVote['id']] = maxVote['label']
 
   hoods = {}
-  for (id, geoms) in blocks_by_hoodid.iteritems():
-    hoods[id] = NeighborhoodArea(cascaded_union(geoms), blockids_by_hoodid[id])
+  print 'doing unions'
+  for (id, blocks) in blocks_by_hoodid.iteritems():
+    geoms = [asShape(eval(block['geojson_geom'])) for block in blocks]
+    blockids = [block['geoid10'] for block in blocks]
+    pop10 = sum([block['pop10'] for block in blocks])
+    housing10 = sum([block['housing10'] for block in blocks])
+
+    geom = cascaded_union(geoms)
+    hoods[id] = NeighborhoodArea(geom, blockids, pop10, housing10)
   return (hoods, id_to_label)
 
-def getNeighborhoodsGeoJsonByArea(conn, areaid, user):
-  (hoods, id_to_label) = getNeighborhoodsByArea(conn, areaid, user)
+def reproject(latlngs):
+    """Returns the x & y coordinates in meters using a sinusoidal projection"""
+    from math import pi, cos, radians
+    earth_radius = 6371009 # in meters
+    lat_dist = pi * earth_radius / 180.0
+    y = [ll[0] * lat_dist for ll in latlngs]
+    x = [long * lat_dist * cos(radians(lat)) 
+                for lat, long in latlngs]
+    return x, y
+
+def area_of_polygon(x, y):
+    """Calculates the area of an arbitrary polygon given its verticies"""
+    area = 0.0
+    for i in xrange(-1, len(x)-1):
+        area += x[i] * (y[i+1] - y[i-1])
+    return abs(area) / 2.0
+
+def area_of_shape(shape):
+  (x, y) = reproject([(ll[1], ll[0]) for ll in shape.exterior.coords])
+  return area_of_polygon(x, y)
+
+def getNeighborhoodsGeoJsonByAreas(conn, areaids, user):
+  (hoods, id_to_label) = getNeighborhoodsByAreas(conn, areaids, user)
   neighborhoods = []
 
   for (id, nhoodarea) in hoods.iteritems():
+    shape = nhoodarea.shape
+    area_m = 0
+    if type(shape) == shapely.geometry.Polygon: 
+      area_m = area_of_shape(shape)
+    elif type(shape) == shapely.geometry.MultiPolygon: 
+      area_m = sum([area_of_shape(s) for s in shape.geoms])
+    else:
+      print 'unkown shape type: ' + type(shape)
+
     geojson = { 
       'type': 'Feature',
       'properties': {
         'id': id,
+        'area_m': area_m,
         'label': id_to_label[id],
-        'blockids': nhoodarea.blockids
+        'blockids': ','.join(nhoodarea.blockids),
+        'pop10': nhoodarea.pop10,
+        'housing10': nhoodarea.housing10
       },
       'geometry': mapping(nhoodarea.shape)
     }

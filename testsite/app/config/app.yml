@@ -2,7 +2,6 @@ COMMON: &common
   SECRET_KEY: insecure1
   SECURITY_POST_LOGIN_VIEW: '/profile'
 
-  SQLALCHEMY_DATABASE_URI = 'sqlite://./app.db'
   ADMIN_CREDENTIALS: 'admin,password'
 
   SECURITY_TRACKABLE: True
@@ -12,10 +11,12 @@ COMMON: &common
 
 DEVELOPMENT: &development
   <<: *common
+  SQLALCHEMY_DATABASE_URI: 'postgresql://postgres@localhost:5432/gisdev'
   DEBUG: True
 
 PRODUCTION: &production
   <<: *common
+  SQLALCHEMY_DATABASE_URI: 'postgresql://postgres@localhost:5432/gis'
   DEBUG: True
   SECURITY_PASSWORD_HASH: bcrypt
   SOCIAL_APP_URL: http://flask-social-example.herokuapp.com/
