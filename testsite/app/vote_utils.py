@@ -124,7 +124,7 @@ def getVotesForBlocks(conn, blockids, user):
   if user:
     print user
     userId = user['id']
-    cur.execute("""select g.woe_id, blockid, name, weight FROM """ + USER_VOTES_TABLE + """ v JOIN geoplanet_places g ON v.woe_id = g.woe_id WHERE v.userid = %s AND v.blockid IN %s ORDER BY g.woe_id, ts ASC""", (userId, tuple(blockids)))
+    cur.execute("""select g.woe_id, blockid, name, weight FROM """ + USER_VOTES_TABLE + """ v JOIN geoplanet_places g ON v.woe_id = g.woe_id WHERE v.userid = %s AND v.blockid IN %s ORDER BY ts ASC""", (userId, tuple(blockids)))
     addUserVotes(cur.fetchall(), votes)
   return votes
 
@@ -167,7 +167,7 @@ def getVotes(conn, areaids, user):
   if user:
     userId = user['id']
     print 'getting user votes'
-    cur.execute("""select g.woe_id, blockid, name, weight FROM """ + USER_VOTES_TABLE + """ v JOIN geoplanet_places g ON v.woe_id = g.woe_id WHERE v.userid = %s """ % userId + """ AND (""" + ' OR '.join(id_clauses) + """) ORDER BY g.woe_id, ts ASC""")
+    cur.execute("""select g.woe_id, blockid, name, weight FROM """ + USER_VOTES_TABLE + """ v JOIN geoplanet_places g ON v.woe_id = g.woe_id WHERE v.userid = %s """ % userId + """ AND (""" + ' OR '.join(id_clauses) + """) ORDER BY ts ASC""")
     print 'got'
     addUserVotes(cur.fetchall(), votes)
     

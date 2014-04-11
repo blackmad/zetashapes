@@ -24,7 +24,7 @@ import vote_utils
 import sqlalchemy.pool as pool
 
 def getPostgresConnection():
-  print app.config['SQLALCHEMY_DATABASE_URI']
+  #print app.config['SQLALCHEMY_DATABASE_URI']
   import urlparse
   result = urlparse.urlparse(app.config['SQLALCHEMY_DATABASE_URI'])
   username = result.username
@@ -42,7 +42,7 @@ def jsonify(*args, **kwargs):
   return current_app.response_class(json.dumps(dict(*args, **kwargs), indent=None), mimetype='application/json')
 
 if speedups.available:
-  print 'shapely speedups available!!!!'
+  #print 'shapely speedups available!!!!'
   speedups.enable()
 
 # start using sqlalchemy cursor, models etc, please
@@ -96,12 +96,12 @@ def stateCounts():
 def addHood():
   conn = getPostgresConnection()
   cur = conn.cursor()
-  print request.args
+  #print request.args
   apikey = request.args.get('key', '')
   user = findUserByApiKey(conn, apikey)
 
   label = request.args.get('label', '')
-  print label
+  #print label
   parentid = request.args.get('parentid', '')
   if not label:
     raise Exception('no label specified')
@@ -113,7 +113,7 @@ def addHood():
   rows = cur.fetchall()
   if len(rows) > 0:
     hoodId = rows[0][0]
-    print 'had already %s' % hoodId
+    #print 'had already %s' % hoodId
   else:
     cur.execute("insert into geoplanet_places values ((select max(woe_id) FROM geoplanet_places) + 1, 'US', %s, 'en', 'Suburb', %s, %s) RETURNING woe_id", (label, parentid, str(user['id'])))
     conn.commit()
@@ -123,7 +123,7 @@ def addHood():
   votepairs = [IncomingBlockVote(blockId, hoodId, 1) for blockId in blockids]
 
   resp = applyIncomingVotes(conn, user, votepairs)
-  print resp
+  #print resp
   return resp
 
 @app.route('/api/blocksByGeom', methods=['GET'])
@@ -173,7 +173,7 @@ def getNeighborhoodsByAreas(conn, areaids, user):
   intent = request.args.get('intent', None)
   if intent == 'download':
     jresponse.headers['Content-Disposition'] = 'attachment; filename=%s.geojson' % '-'.join(areaids)
-  # print jresponse
+  # #print jresponse
 
   return jresponse
 
@@ -281,7 +281,7 @@ def findUserByApiKey(conn, api_key):
     return None
 
 def modifyUsersVoteCount(cur, userLevel, blockid, woeid, incr):
-  print 'doing modify'
+  #print 'doing modify'
   cur.execute("""update  """ + vote_utils.VOTES_TABLE + """ SET count = count + %s WHERE label=%s AND id=%s""", (
     incr, woeid, blockid
   ))
@@ -308,8 +308,8 @@ def do_vote():
 
     # votes are in the form blockid,woeid;blockid,woeid;...
     for votepair in votes.split(';'):
-      #print votepair
-      #print votepair.split(',')
+      ##print votepair
+      ##print votepair.split(',')
       voteparts = votepair.split(',')
 
       if len(voteparts) == 2:
@@ -317,7 +317,7 @@ def do_vote():
       elif len(voteparts) == 3:
         votepairs.append(IncomingBlockVote(voteparts[0], int(voteparts[1]), int(voteparts[2])))
   
-  #print votepairs
+  ##print votepairs
 
   apikey = formdata.get('key', '')
   user = findUserByApiKey(conn, apikey)
@@ -332,17 +332,17 @@ def applyIncomingVotes(conn, user, votepairs):
 
   blockids = tuple([v.blockid for v in votepairs])
 
-  print 'fetching user votes'
+  #print 'fetching user votes'
   rows = vote_utils.getUserVotesForBlocks(conn, userId, blockids)
-   #print rows
+   ##print rows
   existing_votes = defaultdict(list)
   for v in rows:
     existing_votes[v['blockid']].append(v)
-  #print existing_votes
+  ##print existing_votes
 
   woe_ids = tuple([v.woe_id for v in votepairs])
 
-  print 'fetching votes'
+  #print 'fetching votes'
   cur.execute("""select id, COUNT(*) as c FROM """ + vote_utils.VOTES_TABLE + """ WHERE source='users' AND id IN %s AND label IN %s GROUP BY id""", (
     blockids, woe_ids
   ))
@@ -352,12 +352,12 @@ def applyIncomingVotes(conn, user, votepairs):
   user_votes_to_insert = []
   votes_to_insert = []
   for vote in votepairs:
-    print 'dealing with %s' % (vote, )
+    #print 'dealing with %s' % (vote, )
     #print 'looking at label vote %s for block %s' % (vote.woe_id, vote.blockid)
     #print existing_votes[vote.blockid]
 
     already_had_vote = False
-    for existing_vote in existing_votes[vote.blockid]:
+    for existing_vote in existing_votes[vote.blockid][-1:]:
       #print 'existing vote %s' % existing_vote
       if existing_vote['woe_id'] == vote.woe_id and existing_vote['weight'] == vote.weight:
         already_had_vote = True
@@ -372,15 +372,16 @@ def applyIncomingVotes(conn, user, votepairs):
 
     if not already_had_vote:
       if vote.blockid in existingAggregatedVotes:
+        #print 'we have an existing row to incr'
         # we have an existing row to increment
         modifyUsersVoteCount(cur, user['level'], vote.blockid, vote.woe_id, vote.weight)
       else:
         #print 'trying to insert'
         votes_to_insert.append(cur.mogrify("""(%s, %s, %s, 'users')""", (vote.blockid, vote.woe_id, vote.weight)))
-      user_votes_to_insert.append(cur.mogrify("""(%s, %s, %s, %s, 'now')""", (userId, vote.blockid, vote.woe_id, vote.weight)))
+    user_votes_to_insert.append(cur.mogrify("""(%s, %s, %s, %s, 'now')""", (userId, vote.blockid, vote.woe_id, vote.weight)))
 
     # bulk insert these
-  print 'doing insert'
+  #print 'doing insert'
   if user_votes_to_insert:
     cur.execute("""INSERT INTO """ + vote_utils.USER_VOTES_TABLE + """ (userid, blockid, woe_id, weight, ts) values %s""" % (', '.join(user_votes_to_insert)))
   if votes_to_insert:

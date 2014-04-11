@@ -63,6 +63,9 @@ def login():
 
     return render_template('login.html', form=LoginForm())
 
+@app.route('/games/foursquare')
+def editor(areaid=None):
+    return render_template('games/foursquare.html', areaid=areaid)
 
 @app.route('/editor/<areaid>')
 def editor(areaid=None):
